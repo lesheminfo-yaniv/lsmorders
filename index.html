@@ -592,7 +592,7 @@ function startRec(){rec=new SR();rec.lang="he-IL";rec.interimResults=true;rec.co
     if(END_RX.test(vText())){V.sess=V.sess.replace(END_RX,"");if(!END_RX.test(V.done))return finishVoice()}
     armTimer()};
   rec.onerror=e=>{if(e.error==="no-speech"||e.error==="aborted")return;V.want=false;
-    addMsg("a",e.error==="not-allowed"||e.error==="service-not-allowed"?"הדפדפן לא מאפשר מיקרופון בדף הזה. לחץ על סימן המיקרופון במקלדת של הטלפון ודבר, או הקלד.":"לא שמעתי טוב. נסה שוב.")};
+    addMsg("a",e.error==="not-allowed"||e.error==="service-not-allowed"?"הדפדפן לא מאפשר מיקרופון בדף הזה. לחץ על סימן המיקרופון במקלדת של הטלפון ודבר, או הקלד.":e.error==="audio-capture"?"לא נמצא מיקרופון במחשב, או שתוכנה אחרת תופסת אותו (זום, טימס, וואטסאפ). בדוק בהגדרות הקול של Windows.":e.error==="network"?"זיהוי הדיבור לא מצליח להתחבר לשרת (שגיאת רשת). בדפדפן Edge זה קורה לפעמים: נסה ב-Chrome.":"המיקרופון נעצר (קוד: "+e.error+"). לחץ שוב על המיקרופון.")};
   rec.onend=()=>{V.done=vText();V.sess="";   // הדפדפן עוצר לבד אחרי הפסקה: ממשיכים להקשיב עד שהשאלה הסתיימה
     if(V.want){try{rec.start();return}catch(e){}}
     listening=false;$("fab").classList.remove("rec");vStatus("הקלד שאלה, או לחץ על המיקרופון")};
