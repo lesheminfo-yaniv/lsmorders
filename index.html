@@ -1,0 +1,693 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700&family=Assistant:wght@400;600;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* מעקב רצפת ייצור: פס כותרת, מוני מצב, עץ הזמנות או לוח שלבים, כרטיס הזמנה בצד, עוזר קולי צף */
+:root{
+  --bg:#eef1f4;--panel:#fff;--ink:#1b2430;--muted:#5d6b7b;--line:#d6dde5;--steel:#2f4a66;--steel2:#3d6189;
+  --accent:#e0a100;--accent-ink:#2a1f00;--ok:#1f7a4c;--warn:#b26b00;--bad:#b3261e;--chip:#e6ebf1;
+  --display:"Rubik",Arial,sans-serif;--body:"Assistant",Arial,sans-serif;--mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root{--bg:#12171d;--panel:#1a222b;--ink:#e7edf3;--muted:#9aa8b7;--line:#2c3743;--steel:#8fb1d4;--steel2:#6d93bb;--accent:#f2b81c;--accent-ink:#1e1600;--ok:#57c28a;--warn:#e8a44a;--bad:#ff8a80;--chip:#24303c;color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--body)}
+button,select,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance}
+[hidden]{display:none!important}
+
+/* פס עליון */
+.bar{background:var(--steel);color:#fff;padding:12px max(16px,env(safe-area-inset-right)) 12px max(16px,env(safe-area-inset-left))}
+.bar .in{max-width:1500px;margin:0 auto;display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center}
+.logo{display:flex;align-items:center;gap:10px}
+.logo .mark{width:34px;height:34px;border-radius:7px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-family:var(--display);font-weight:700;font-size:15px;letter-spacing:.02em}
+.logo h1{font-size:20px;color:#fff}
+.logo small{display:block;font-size:12px;opacity:.8;font-family:var(--body)}
+.tabs{display:flex;gap:4px;background:rgba(255,255,255,.12);border-radius:9px;padding:3px}
+.tabs button{border:0;background:transparent;color:#fff;opacity:.8;padding:7px 14px;border-radius:7px;font-weight:600}
+.tabs button[aria-selected="true"]{background:#fff;color:var(--steel);opacity:1}
+.sp{flex:1}
+.who{font-size:13px;opacity:.85}
+.ghost{background:transparent;border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:7px;padding:6px 10px;font-size:13px}
+
+.wrap{max-width:1500px;margin:0 auto;padding:14px max(16px,env(safe-area-inset-right)) 120px max(16px,env(safe-area-inset-left))}
+.sync{font-size:12.5px;color:var(--muted);margin-bottom:10px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:10px;margin-bottom:14px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;text-align:right}
+.kpi b{display:block;font-family:var(--display);font-size:26px;line-height:1.1}
+.kpi span{font-size:12.5px;color:var(--muted)}
+.kpi.alert b{color:var(--bad)}
+.kpi.on{outline:2px solid var(--accent);background:color-mix(in srgb,var(--accent) 10%,var(--panel))}
+.filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.filters input,.filters select{padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+.filters input{flex:1;min-width:200px}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:8px 14px;font-weight:600}
+.btn.primary{background:var(--steel);border-color:var(--steel);color:#fff}
+.note{font-size:12.5px;color:var(--muted)}
+.empty{padding:40px;text-align:center;color:var(--muted)}
+
+/* עץ */
+.olist{display:grid;gap:8px}
+.orow{background:var(--panel);border:1px solid var(--line);border-radius:10px;border-inline-start:5px solid var(--line)}
+.orow.miss{border-inline-start-color:var(--warn)} .orow.late,.orow.flag{border-inline-start-color:var(--bad)}
+.orow.hist{border-inline-start-color:var(--ok)}
+.ohead{display:grid;grid-template-columns:auto 1fr auto;gap:4px 12px;align-items:center;padding:10px 12px;cursor:pointer;width:100%;border:0;background:transparent;text-align:right}
+.ohead .car{color:var(--muted);transition:transform .15s;font-size:13px}
+.orow[open-row] .ohead .car{transform:rotate(-90deg)}
+.ohead .t1{display:flex;gap:10px;align-items:baseline;min-width:0;flex-wrap:wrap}
+.ohead .cust{font-weight:700;font-size:16px}
+.ohead .what{color:var(--muted);font-size:13.5px;grid-column:2/4;min-width:0}
+.stg{font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap;background:var(--chip);color:var(--muted)}
+.stg.s-prod{background:color-mix(in srgb,var(--steel2) 22%,transparent);color:var(--steel)}
+.stg.s-paint{background:color-mix(in srgb,#9b59b6 20%,transparent);color:#8e44ad}
+.stg.s-material{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.stg.s-ready{background:color-mix(in srgb,var(--accent) 30%,transparent);color:var(--accent-ink)}
+.stg.s-delivered,.stg.s-closed{background:color-mix(in srgb,var(--ok) 18%,transparent);color:var(--ok)}
+.tags{display:flex;flex-wrap:wrap;gap:4px;grid-column:2/4}
+.tag{font-size:11.5px;padding:1px 8px;border-radius:999px;background:var(--chip);color:var(--muted);white-space:nowrap}
+.tag.w{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}
+.tag.b{background:color-mix(in srgb,var(--bad) 14%,transparent);color:var(--bad);white-space:normal}
+.sw{width:10px;height:10px;border-radius:2px;border:1px solid var(--line);display:inline-block;margin-inline-end:4px;vertical-align:-1px}
+.obody{padding:0 12px 12px;display:grid;gap:10px}
+.tree{display:grid;gap:5px}
+.tree details{border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+.tree summary{list-style:none;cursor:pointer;padding:8px 10px;display:flex;gap:8px;align-items:center;font-weight:700}
+.tree summary::-webkit-details-marker{display:none}
+.tree summary::before{content:"◂";color:var(--muted);transition:transform .12s}
+.tree details[open]>summary::before{transform:rotate(-90deg)}
+.tree .cnt{font-family:var(--mono);font-size:12px;color:var(--muted);font-weight:500}
+.tree .ty{width:9px;height:9px;border-radius:2px}
+.tree details.none summary{color:var(--muted);font-weight:600}
+.titems{padding:0 10px 8px}
+.titem{display:grid;grid-template-columns:80px 1fr auto;gap:2px 10px;padding:7px 0;border-top:1px dashed var(--line);padding-inline-start:14px;position:relative}
+.titem::before{content:"";position:absolute;inset-inline-start:4px;top:0;bottom:0;border-inline-start:1px solid var(--line)}
+.titem .d{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.titem .tt{font-weight:600;min-width:0;overflow-wrap:anywhere}
+.smartbar{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;padding:10px 12px;margin:0 0 10px;border:1px solid var(--line);border-radius:10px}
+.s-cancelled{text-decoration:line-through;opacity:.7}
+.tadd{padding:6px 0 2px;padding-inline-start:14px}
+.nt{color:inherit!important;font-style:italic}
+[hidden]{display:none!important}
+.qgrp{margin:0 0 12px}
+.today{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 10px}.tlabel{font-weight:700;margin-inline-end:4px}
+.tchip{display:inline-flex;gap:6px;align-items:baseline;border:1px solid var(--line);background:transparent;color:inherit;border-radius:999px;padding:5px 12px;font:inherit;cursor:pointer}.tchip.hot{border-color:#c0392b;background:#c0392b14}.tchip.hot b{color:#c0392b}
+.qcard.done{opacity:.75}
+.qprev{border:1px solid var(--line);border-radius:10px;padding:12px;background:#fff;color:#222;margin:6px 0}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#2f4a66;color:#fff;padding:10px 16px;border-radius:10px;z-index:99;box-shadow:0 4px 14px rgba(0,0,0,.25)}.qgrp>summary{font-weight:700;padding:8px 0;cursor:pointer}
+.qcard{border:1px solid var(--line);border-radius:12px;padding:12px;margin:8px 0;display:grid;gap:6px;border-inline-start:5px solid var(--line)}
+.qcard.cold{border-inline-start-color:#c0392b}.qcard.warm{border-inline-start-color:#e0a100}.qcard.new{border-inline-start-color:#1f9d55}
+.qcard .r1{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:baseline}.qbtns{display:flex;flex-wrap:wrap;gap:6px}.qmsg textarea{width:100%;box-sizing:border-box;font:inherit}
+.titem .ted{grid-column:1/4;display:flex;gap:14px;justify-content:flex-end}
+.lnk{background:none;border:0;padding:2px 0;color:var(--muted);font:inherit;font-size:13px;text-decoration:underline;cursor:pointer}
+.lnk:hover{color:inherit}
+.tedit{display:grid;grid-template-columns:110px 1fr;gap:6px 10px;padding:10px;margin:6px 0;border:1px solid var(--line);border-radius:10px;align-items:center}
+.tedit textarea,.tedit input,.tedit select{width:100%;box-sizing:border-box;font:inherit}
+.tedit .tbtns{grid-column:1/3;display:flex;gap:8px;justify-content:flex-end}
+.titem .by{font-weight:400;color:var(--muted);font-size:12px}
+@media (max-width:600px){.tedit{grid-template-columns:1fr}.tedit .tbtns{grid-column:1}}
+.titem .sn{grid-column:2/4;font-size:13px;color:var(--muted);overflow-wrap:anywhere}
+a{color:var(--steel2)}
+
+/* לוח */
+.lanes{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(250px,1fr);gap:10px;overflow-x:auto;padding-bottom:8px}
+.lane{background:var(--chip);border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.lane h3{font-size:14px;display:flex;justify-content:space-between;padding:2px 4px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:9px 10px;text-align:right;display:grid;gap:4px;border-inline-start:4px solid var(--line)}
+.card.miss{border-inline-start-color:var(--warn)} .card.late,.card.flag{border-inline-start-color:var(--bad)}
+.card .r1{display:flex;justify-content:space-between;gap:8px}
+.card .cust{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card .what{font-size:13px;color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+/* כרטיס צד */
+.scrim{position:fixed;inset:0;background:rgba(10,15,20,.45);z-index:20}
+.sheet{position:fixed;top:0;bottom:0;left:0;width:min(580px,100%);background:var(--panel);z-index:21;overflow-y:auto;padding:16px 18px 40px;box-shadow:0 0 40px rgba(0,0,0,.25);display:grid;gap:16px;align-content:start}
+.sheet .hd{display:flex;justify-content:space-between;gap:10px}
+.stepper{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.stepper button{border:1px solid var(--line);background:var(--bg);border-radius:5px;padding:7px 2px;font-size:11.5px;line-height:1.2;color:var(--muted)}
+.stepper button.done{background:color-mix(in srgb,var(--steel2) 18%,var(--panel));color:var(--ink)}
+.stepper button.cur{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
+.sec h3{font-size:14px;color:var(--steel2);margin-bottom:6px}
+dl.kv{display:grid;grid-template-columns:110px 1fr;gap:6px 12px;margin:0}
+dl.kv dt{color:var(--muted);font-size:13px} dl.kv dd{margin:0;overflow-wrap:anywhere}
+.box{border-radius:8px;padding:8px 10px;font-size:14px;background:color-mix(in srgb,var(--warn) 12%,var(--panel));border:1px solid color-mix(in srgb,var(--warn) 35%,transparent)}
+.box.b{background:color-mix(in srgb,var(--bad) 10%,var(--panel));border-color:color-mix(in srgb,var(--bad) 35%,transparent)}
+.edit{display:grid;grid-template-columns:110px 1fr;gap:6px 12px;align-items:center}
+.edit input,.edit select,textarea{padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:var(--bg);min-width:0;width:100%}
+textarea{min-height:60px}
+.log{display:grid;gap:6px}
+.log div{font-size:13.5px;border-inline-start:2px solid var(--line);padding-inline-start:8px}
+.log small{color:var(--muted)}
+
+/* כניסה */
+.gate{min-height:100vh;display:grid;place-items:center;padding:16px;background:linear-gradient(160deg,var(--steel),#1c2f44)}
+.gatebox{background:var(--panel);border-radius:14px;padding:28px;width:min(380px,100%);display:grid;gap:12px;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.gatebox .logo h1{color:var(--ink)} .gatebox .logo small{color:var(--muted)}
+.gatebox input{padding:11px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+.err{color:var(--bad);font-size:13px;min-height:1.2em}
+
+/* עוזר קולי */
+.fab{position:fixed;left:max(18px,env(safe-area-inset-left));bottom:max(18px,env(safe-area-inset-bottom));z-index:30;width:62px;height:62px;border-radius:50%;border:0;background:var(--accent);color:var(--accent-ink);box-shadow:0 8px 24px rgba(0,0,0,.25);display:grid;place-items:center}
+.fab svg{width:28px;height:28px}
+.fab.rec{background:var(--bad);color:#fff;animation:pulse 1.2s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--bad) 60%,transparent)}100%{box-shadow:0 0 0 18px transparent}}
+.chat{position:fixed;left:max(18px,env(safe-area-inset-left));bottom:92px;z-index:30;width:min(400px,calc(100% - 36px));max-height:65vh;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 16px 40px rgba(0,0,0,.25);display:flex;flex-direction:column;overflow:hidden}
+.chat .ch{padding:10px 12px;background:var(--steel);color:#fff;display:flex;gap:8px;align-items:center}
+.chat .ch select{background:rgba(255,255,255,.15);border:0;border-radius:6px;color:#fff;padding:3px 6px}
+.chat .ch select option{color:#000}
+.chat .msgs{padding:10px;overflow-y:auto;display:grid;gap:8px;align-content:start;flex:1}
+.m{padding:8px 10px;border-radius:10px;font-size:14.5px;max-width:90%;white-space:pre-wrap}
+.m.u{background:var(--chip);justify-self:start}
+.m.a{background:color-mix(in srgb,var(--steel2) 14%,var(--panel));justify-self:end}
+.m.a small{display:block;color:var(--muted);font-size:11px}
+.chat form{display:flex;gap:6px;padding:8px;border-top:1px solid var(--line)}
+.chat form input{flex:1;padding:9px;border:1px solid var(--line);border-radius:8px;background:var(--bg);min-width:0}
+@media (max-width:600px){dl.kv,.edit{grid-template-columns:90px 1fr}.stepper button{font-size:10.5px}.ohead .cust{font-size:15px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<section class="gate" id="gate">
+  <form class="gatebox" id="gateForm">
+    <div class="logo"><div class="mark">לש"מ</div><div><h1>הזמנות ל.ש.מ</h1><small>מעקב ייצור ואספקה</small></div></div>
+    <label for="whoIn">השם שלך</label>
+    <input id="whoIn" autocomplete="name" placeholder="למשל: פזית">
+    <label for="pw">סיסמה</label>
+    <input id="pw" type="password" inputmode="numeric" autocomplete="current-password">
+    <div class="err" id="gateErr"></div>
+    <button class="btn primary" type="submit" id="gateBtn">כניסה</button>
+  </form>
+</section>
+
+<div id="app" hidden>
+  <header class="bar"><div class="in">
+    <div class="logo"><div class="mark">לש"מ</div><div><h1>הזמנות ל.ש.מ</h1><small id="sync">טוען…</small></div></div>
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tabLeads" aria-selected="false">לידים ופניות</button>
+      <button role="tab" id="tabList" aria-selected="true">עץ הזמנות</button>
+      <button role="tab" id="tabBoard" aria-selected="false">לוח ייצור</button>
+      <button role="tab" id="tabQuotes" aria-selected="false">הצעות מחיר</button>
+      <button role="tab" id="tabHist" aria-selected="false">היסטוריה</button>
+    </div>
+    <div class="sp"></div>
+    <span class="who" id="whoLbl"></span>
+    <button class="ghost" id="btnSettings" type="button">הגדרות</button>
+    <button class="ghost" id="btnOut" type="button">יציאה</button>
+  </div></header>
+  <main class="wrap">
+    <section class="today" id="today" aria-label="היום"></section>
+    <section class="kpis" id="kpis"></section>
+    <section class="filters">
+      <input id="q" type="search" placeholder="חיפוש או שאלה: לקוח, מספר… או 'תעודת משלוח בלי חשבונית', 'לא שולמו', 'בייצור באיחור'">
+      <select id="fSupplier"><option value="">כל הספקים</option></select>
+      <select id="fDeliv"><option value="">אספקה: הכל</option><option>הובלה</option><option>הובלה והתקנה</option><option>משלוח</option><option>איסוף עצמי</option><option value="?">לא צוין</option></select>
+    </section>
+    <section id="view"></section>
+  </main>
+</div>
+<div id="sheetRoot"></div>
+
+<div class="chat" id="chat" hidden>
+  <div class="ch"><b>שאל על ההזמנות</b><span class="sp"></span>
+    <select id="prov" aria-label="מי עונה"><option value="">אוטומטי</option><option value="gemini">ג'מיני</option><option value="claude">Claude</option></select>
+    <button class="ghost" id="replayBtn" type="button" aria-label="הקרא שוב">▶</button>
+    <button class="ghost" id="muteBtn" type="button" aria-label="השתק הקראה">🔊</button>
+    <button class="ghost" id="chatX" type="button" aria-label="סגור">✕</button></div>
+  <div class="msgs" id="msgs"><div class="m a">שאל אותי בקול או בכתב. למשל: "מה מוכן לאספקה?", "מה המצב של נס ציונה?", "אילו הזמנות ממתינות לספק?"</div></div>
+  <form id="chatForm"><input id="chatIn" lang="he" enterkeyhint="send" autocomplete="off" placeholder="הקלד שאלה, או לחץ על המיקרופון"><button class="btn primary" type="submit">שלח</button></form>
+</div>
+<button class="fab" id="fab" type="button" aria-label="שאלה קולית" hidden>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><path d="M12 17v5"/></svg>
+</button>
+
+<script>
+const STAGES=[{k:"new",l:"התקבלה"},{k:"material",l:"ממתין לחומר / ספק"},{k:"prod",l:"בייצור"},{k:"paint",l:"בצבע"},{k:"ready",l:"מוכן לאספקה"},{k:"delivered",l:"סופק"},{k:"closed",l:"חשבונית / סגור"},{k:"cancelled",l:"בוטלה"}];
+const OPEN=["new","material","prod","paint","ready"];
+const stageL=k=>(STAGES.find(s=>s.k===k)||{l:k||"—"}).l;
+const RAL={"1013":"#e3d9c6","1016":"#f1dd38","1018":"#faca30","1023":"#f9a800","1028":"#ffa000","2003":"#fa842b","2004":"#e75b12","2011":"#ec7c25","3016":"#a72920","3017":"#d36e70","3020":"#c1121c","5003":"#1f3855","5010":"#13447c","5012":"#0089b6","5015":"#007cb0","5018":"#058b8c","6005":"#114232","6009":"#26392f","6018":"#57a639","6021":"#89ac76","6029":"#006f3d","7016":"#383e42","7024":"#474a50","7037":"#7a7b7a","7038":"#b4b8b0","7039":"#6b665e","7040":"#9da3a6","7042":"#8f9695","7045":"#909090","7047":"#c8c8c7","8003":"#80542f","9005":"#0a0a0a","9006":"#a5a8a6","9007":"#8f8f8c","9001":"#efebdc","9002":"#e7e9de","9003":"#f4f4f4","096":"#c9cbc8","097":"#9c9e9d"};
+const TYPES=[{k:"rivhit",l:"רווחית: הזמנה, תעודות משלוח, חשבוניות",c:"#2f4a66"},{k:"email",l:"מיילים",c:"#c0392b"},{k:"whatsapp",l:"וואטסאפ",c:"#1f9d55"},{k:"call",l:"שיחות טלפון",c:"#8e44ad"},{k:"supplier",l:"ספקים וחומר גלם",c:"#e0a100"},{k:"file",l:"קבצים, שרטוטים והצעות מחיר",c:"#7f8c8d"}];
+const el=(t,a={},...c)=>{const e=document.createElement(t);for(const[k,v]of Object.entries(a)){if(k==="class")e.className=v;else if(k.startsWith("on"))e.addEventListener(k.slice(2),v);else if(v!=null&&v!==false)e.setAttribute(k,v===true?"":v)}for(const x of c.flat()){if(x==null||x===false)continue;e.append(x.nodeType?x:document.createTextNode(String(x)))}return e};
+const $=id=>document.getElementById(id);
+const S={orders:[],quotes:[],leads:[],tab:"list",kpi:"",pw:"",who:"",open:null,sheet:null,ai:{},muted:false,hist:[]};
+const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
+const API="https://script.google.com/macros/s/AKfycbwbvfR_0w_VCmqap5lHR8jzguIIwoT4zrXtU9zQUtR15kj4TnSOQ2SpsyDOoQ1jt-4/exec";
+const IN_GOOGLE=!!(window.google&&google.script&&google.script.run);
+function run(fn,...args){
+  if(IN_GOOGLE)return new Promise((res,rej)=>google.script.run.withSuccessHandler(res).withFailureHandler(e=>rej(e&&e.message?e:new Error(String(e))))[fn](...args));
+  return fetch(API,{method:"POST",body:JSON.stringify({fn,args}),redirect:"follow"}).then(r=>r.json()).then(j=>{if(!j.ok)throw new Error(j.error||"שגיאה");return j.data})}
+
+/* ---- כניסה ---- */
+$("gateForm").addEventListener("submit",async e=>{e.preventDefault();
+  const pw=$("pw").value.trim(),who=$("whoIn").value.trim();
+  if(!who){$("gateErr").textContent="כתוב את השם שלך, כדי שיופיע ביומן העדכונים.";return}
+  $("gateBtn").disabled=true;$("gateErr").textContent="";
+  try{const r=await run("login",pw);S.pw=pw;S.who=who;S.ai=r.ai||{};store.set("lsm_pw",pw);store.set("lsm_who",who);enter()}
+  catch(err){$("gateErr").textContent=err.message.includes("סיסמה")?"סיסמה שגויה. נסה שוב.":"אין חיבור לשרת. נסה שוב בעוד רגע."}
+  $("gateBtn").disabled=false});
+(function(){const pw=store.get("lsm_pw"),who=store.get("lsm_who");if(who)$("whoIn").value=who;if(pw&&who){S.pw=pw;S.who=who;run("login",pw).then(r=>{S.ai=r.ai||{};enter()}).catch(()=>{})}})();
+$("btnOut").onclick=()=>{store.del("lsm_pw");location.reload()};
+function enter(){if(S.timer)return;$("gate").hidden=true;$("app").hidden=false;$("fab").hidden=false;$("whoLbl").textContent=S.who;load();S.timer=setInterval(load,90000)}
+async function load(){try{const ae=document.activeElement;if(S.orders.length&&ae&&(ae.tagName==="INPUT"||ae.tagName==="TEXTAREA")&&ae.id!=="q"&&ae.id!=="chatIn")return;const d=await run("getData",S.pw);const all=d.orders||[];const sig=JSON.stringify(all);if(sig===S.sig&&S.orders.length){$("sync").textContent=d.sync?("עודכן: "+d.sync):"מחובר";return}S.sig=sig;S.leads=all.filter(isL);S.quotes=all.filter(isQ);S.orders=all.filter(o=>!isQ(o)&&!isL(o));if(!S.tabSet&&S.leads.some(o=>o.stage==="lead")){S.tab="leads";S.tabSet=1}S.ai=d.ai||S.ai;$("sync").textContent=d.sync?("עודכן: "+d.sync):"מחובר";render()}catch(e){$("sync").textContent="שגיאה בטעינה: "+e.message}}
+
+/* ---- עזרים ---- */
+const isoL=d=>{d=d instanceof Date?d:new Date(d);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
+const daysSince=d=>{const t=/^\d{4}-\d{2}-\d{2}$/.test(d||"")?new Date(d+"T00:00:00").getTime():Date.parse(d);return isNaN(t)?null:Math.floor((Date.now()-t)/864e5)};
+const fmt=d=>{if(!d)return "";const t=new Date(/^\d{4}-\d{2}-\d{2}$/.test(d)?d+"T00:00:00":d);return isNaN(t)?d:t.toLocaleDateString("he-IL",{day:"2-digit",month:"2-digit",year:"2-digit"})};
+const needsFix=o=>/ספסל|אשפתון|עמוד|מתקן|ערבה|כנרת|נירית|ברצלונה|כליל|פרגולה|מקל סבא|פיקניק|קקל|301|402|505|602|דוגלי|לוח מודעות/.test((o.model||"")+" "+(o.desc||""));
+const needsColor=o=>!/שקיות|נירוסטה|קורטן|ברזי|תחזוקת|שקית/.test((o.model||"")+" "+(o.desc||""));
+function missing(o){const m=[];if(!o.model&&!o.desc)m.push("מוצר");if(!o.qty)m.push("כמות");if(needsColor(o)&&!o.color)m.push("צבע");if(needsFix(o)&&!o.fixing)m.push("קיבוע");if(!o.delivery)m.push("הובלה / איסוף");if(/הובלה|משלוח/.test(o.delivery||"")&&!o.address)m.push("כתובת");if(!o.contact&&!o.phone)m.push("איש קשר");return m}
+const isLate=o=>OPEN.includes(o.stage)&&(daysSince(o.date)||0)>(+o.leadDays||63);
+const sup=o=>(o.suppliers||[]).map(s=>s.name).join(", ");
+function ral(c){if(!c)return null;const m=String(c).match(/\b(\d{3,4})\b/);const hx=m&&RAL[m[1]];return el("span",{class:"tag"},hx?el("span",{class:"sw",style:"background:"+hx}):null,c)}
+function dups(){const c={};S.orders.forEach(o=>{if(o.num)c[o.num]=(c[o.num]||0)+1});return new Set(Object.keys(c).filter(k=>c[k]>1))}
+
+
+/* ---- לידים ופניות ---- */
+function isL(o){return /^lead/.test(o.stage||"")}
+const SRC_C={"וואטסאפ":"#1f9d55","מייל":"#c0392b","אתר":"#2f4a66","שיחה":"#8e44ad","חזרה טלפונית":"#e0a100"};
+function lCard(o){const days=dAgo(o.date),src=o.desc||"",reply=o.prodNotes||"",wa=waLink(o.phone,reply||("שלום"+(o.contact?" "+o.contact.split(" ")[0]:"")+", כאן יניב מל.ש.מ מתכות. חוזר אליך לגבי הפנייה שלך."));
+  const th=(o.links||[]).find(l=>!l.hidden&&l.type==="email"&&l.url),mail=o.email||"";
+  const gm="https://mail.google.com/mail/?authuser=lesheminfo@gmail.com&view=cm&fs=1&to="+encodeURIComponent(mail)+"&su="+encodeURIComponent("ל.ש.מ מתכות – בהמשך לפנייתך")+"&body="+encodeURIComponent(reply);
+  const today=isoL(new Date()),done=(st,t)=>()=>save(o,{stage:st,stageUser:today},t);
+  const nIn=el("input",{placeholder:"מה קרה? למשל: דיברתי, מחכה למידות"}),nD=el("input",{type:"date",value:(()=>{const n=new Date();n.setDate(n.getDate()+3);return isoL(n)})()});
+  const nf=el("div",{class:"tedit",hidden:true},el("label",{},"עדכון"),nIn,el("label",{},"להזכיר לי ב-"),nD,el("div",{class:"tbtns"},el("button",{class:"btn primary",type:"button",onclick:()=>save(o,{nextFollow:nD.value},"פנייה: "+(nIn.value.trim()||"נוצר קשר"))},"שמור")));
+  const qIn=el("input",{placeholder:"מספר הצעה (לא חובה)"}),qf=el("div",{class:"tedit",hidden:true},el("label",{},"מספר הצעה"),qIn,el("div",{class:"tbtns"},el("button",{class:"btn primary",type:"button",onclick:()=>save(o,{stage:"lead_quoted",stageUser:today,num:qIn.value.trim()},"נשלחה הצעת מחיר "+qIn.value.trim())},"שמור")));
+  const box=el("div",{class:"qmsg",hidden:true},el("textarea",{rows:5},reply||""));
+  const open=o.stage==="lead",cls=!open?"done":days>=3?"cold":days>=1?"warm":"new";
+  return el("div",{class:"qcard "+cls},
+    el("div",{class:"r1"},el("b",{},o.customer||""),src?el("span",{class:"tag",style:"color:#fff;background:"+(SRC_C[src]||"#7f8c8d")},src):null,el("span",{class:"num note"},fmt(o.date)+" · "+(days===0?"היום":days+" ימים")),!open?el("span",{class:"tag"},stageL(o.stage)):null,o.num?el("span",{class:"tag num"},"הצעה "+o.num):null),
+    o.model?el("div",{class:"what"},o.model):null,
+    ...(open?(o.flags||[]).map(f=>el("div",{class:"box b"},"לעשות: ",el("b",{},f))):[]),
+    el("div",{class:"note"},[o.contact&&("איש קשר: "+o.contact),o.phone,mail,(o.moreContacts||"").replace(/^אחראי: יניב$/,"")].filter(Boolean).join(" · ")),
+    o.nextFollow?el("div",{class:"note"},"תזכורת: "+fmt(o.nextFollow)):null,
+    el("div",{class:"qbtns"},
+      wa?el("a",{class:"btn primary",href:wa,target:"_blank",rel:"noopener",onclick:()=>setTimeout(()=>save(o,{nextFollow:(()=>{const n=new Date();n.setDate(n.getDate()+2);return isoL(n)})()},"נשלחה תשובה בוואטסאפ"),300)},"השב בוואטסאפ"):null,
+      th?el("a",{class:"btn",href:th.url,target:"_blank",rel:"noopener",onclick:()=>{if(reply)copyRich(reply.replace(/\n/g,"<br>"),reply).then(ok=>toast(ok?"התשובה הועתקה – לחץ 'השב' ואז Ctrl+V":"פתחתי את המייל"))}},"השב במייל"):null,
+      mail&&!th?el("a",{class:"btn",href:gm,target:"_blank",rel:"noopener"},"מייל ללקוח"):null,
+      reply?el("button",{class:"btn",type:"button",onclick:()=>{box.hidden=!box.hidden}},"תשובה מוכנה"):null,
+      open?el("button",{class:"btn",type:"button",onclick:()=>{nf.hidden=!nf.hidden}},"דיברתי / עדכון"):null,
+      open?el("button",{class:"btn",type:"button",onclick:()=>{qf.hidden=!qf.hidden}},"נשלחה הצעה"):null,
+      open?el("button",{class:"btn",type:"button",onclick:done("lead_done","הפנייה טופלה")},"טופל"):null,
+      open?el("button",{class:"btn",type:"button",onclick:done("lead_lost","הפנייה לא רלוונטית")},"לא רלוונטי"):el("button",{class:"btn",type:"button",onclick:()=>save(o,{stage:"lead",stageUser:""},"הפנייה נפתחה מחדש")},"פתח מחדש"),
+      el("button",{class:"btn",type:"button",onclick:()=>openSheet(o.id)},"כרטיס ומסמכים")),
+    nf,qf,box)}
+function newLeadForm(){const f=["customer:שם הלקוח / העסק","contact:איש קשר","phone:טלפון","email:מייל","model:מה ביקשו"].map(x=>x.split(":"));const ins={};
+  const src=el("select",{},...["וואטסאפ","מייל","אתר","שיחה","חזרה טלפונית","הגיע למפעל"].map(x=>el("option",{value:x},x)));
+  const box=el("div",{class:"tedit"},...f.flatMap(([k,l])=>{ins[k]=el("input",{});return[el("label",{},l),ins[k]]}),el("label",{},"מקור"),src,el("label",{},"מה לעשות"),ins.need=el("input",{placeholder:"למשל: לשלוח הצעה לספסלים"}),
+    el("div",{class:"tbtns"},el("button",{class:"btn primary",type:"button",onclick:async()=>{const o={stage:"lead",date:isoL(new Date()),desc:src.value,flags:ins.need.value.trim()?[ins.need.value.trim()]:[]};["customer","contact","phone","email","model"].forEach(k=>o[k]=ins[k].value.trim());if(!o.customer&&!o.phone)return;
+      try{const n=await run("addOrder",S.pw,o,S.who);S.leads.push(n);S.newLead=false;render()}catch(e){toast("השמירה נכשלה: "+e.message)}}},"שמור פנייה"),el("button",{class:"btn",type:"button",onclick:()=>{S.newLead=false;render()}},"ביטול")));
+  return box}
+function renderLeads(v,q){let L=S.leads;if(S.qsel)L=L.filter(o=>S.qsel.has(o.id));if(q)L=L.filter(o=>textHit(o,q)||String(o.email||"").includes(q));
+  const today=isoL(new Date()),ago=n=>{const d=new Date();d.setDate(d.getDate()-n);return isoL(d)};
+  const open=L.filter(o=>o.stage==="lead"),snz=open.filter(o=>o.nextFollow&&o.nextFollow>today),act=open.filter(o=>!(o.nextFollow&&o.nextFollow>today)).sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+  const recent=L.filter(o=>o.stage!=="lead"&&(o.updatedAt||o.date||"").slice(0,10)>=ago(14)).sort((a,b)=>(b.updatedAt||"").localeCompare(a.updatedAt||""));
+  v.replaceChildren(el("div",{class:"smartbar"},el("b",{},act.length+" פניות לטיפול"),snz.length?el("span",{class:"tag"},"ממתינות: "+snz.length):null,el("span",{class:"note"},"מכל הערוצים: אתר, מייל, וואטסאפ, שיחות. מתעדכן כל בוקר מדוח הבוקר."),el("button",{class:"btn primary",type:"button",onclick:()=>{S.newLead=true;render()}},"+ פנייה חדשה")),
+    S.newLead?newLeadForm():null,
+    act.length?el("details",{class:"qgrp",open:true},el("summary",{},"לטיפול – הוותיקות קודם ",el("span",{class:"cnt"},act.length)),...act.map(lCard)):el("div",{class:"empty"},"אין פניות פתוחות 👍"),
+    snz.length?el("details",{class:"qgrp",open:true},el("summary",{},"ממתינות – כבר דיברת ",el("span",{class:"cnt"},snz.length)),...snz.sort((a,b)=>a.nextFollow.localeCompare(b.nextFollow)).map(lCard)):null,
+    recent.length?el("details",{class:"qgrp"},el("summary",{},"טופלו או נשלחה הצעה ב-14 הימים האחרונים ",el("span",{class:"cnt"},recent.length)),...recent.map(lCard)):null)}
+function todayStrip(){const today=isoL(new Date());
+  const leads=S.leads.filter(o=>o.stage==="lead"&&!(o.nextFollow&&o.nextFollow>today)).length;
+  const cold=S.quotes.filter(o=>o.stage==="quote"&&qStatus(o,today)==="cold").length,warm=S.quotes.filter(o=>o.stage==="quote"&&qStatus(o,today)==="warm").length;
+  const won=S.quotes.filter(o=>o.stage==="quote_won"&&(o.flags||[]).some(f=>/^סימנת 'התקבלה הזמנה'/.test(f))).length;
+  const d30=(()=>{const d=new Date();d.setDate(d.getDate()-30);return isoL(d)})();
+  const dnNoInv=S.orders.filter(o=>o.stage!=="cancelled"&&(o.links||[]).some(l=>l.type==="rivhit"&&!l.hidden&&/^תעודת משלוח/.test(l.title||"")&&(l.date||"")>=d30)&&!docs(o).inv).length;
+  const late=S.orders.filter(o=>OPEN.includes(o.stage)&&isLate(o)).length;
+  const go=(tab,extra)=>()=>{clearSel();S.tab=tab;S.kpi="";S.qst="all";Object.assign(S,extra||{});if(extra&&extra.q!=null)$("q").value=extra.q;else $("q").value="";render()};
+  const it=(n,l,fn,warnN)=>el("button",{type:"button",class:"tchip"+(n>=(warnN||1)?" hot":""),onclick:fn},el("b",{class:"num"},n),el("span",{},l));
+  return [el("span",{class:"tlabel"},"היום:"),it(leads,"פניות לטיפול",go("leads")),it(cold,"הצעות מתקררות",go("quotes",{qst:"cold"})),it(warm,"הצעות לבדוק",go("quotes",{qst:"warm"}),99),it(won,"אושרו בלי הזמנה",go("quotes")),it(dnNoInv,"ת.מ בלי חשבונית (30 יום)",go("list",{q:"תעודת משלוח בלי חשבונית בחודש האחרון"})),it(late,"הזמנות באיחור",()=>{S.tab="list";S.kpi="late";$("q").value="";render()},99)]}
+
+/* ---- הצעות מחיר: מעקב אחרי הצעות שלא הפכו להזמנה ---- */
+function isQ(o){return /^quote/.test(o.stage||"")}
+function dAgo(d){if(!d)return 0;return Math.floor((Date.now()-new Date(d+"T00:00:00"))/864e5)}
+function qInfo(o){const first=String(o.contact||"").split(/[\s,(–-]/)[0].replace(/[^֐-׿a-zA-Z]/g,"");
+  const items=(o.rivhitLines&&o.rivhitLines.length?o.rivhitLines:[o.model,...String(o.desc||"").split(" | ")]).filter(Boolean).filter(x=>!/^(?:[\d.]+×\s*)?(?:הובלה|משלוח)/.test(x)).slice(0,4).map(x=>x.replace(/\s*(מהצעת מחיר|מהזמנה).*$/,"").slice(0,110));
+  const rep=(o.flags||[]).find(f=>/^הלקוח הגיב/.test(f)),repTxt=rep?rep.split(": ").slice(1).join(": ").trim():"";
+  const dl=new Date();dl.setDate(dl.getDate()+(dl.getDay()>=3?5:3));const dls=dl.toLocaleDateString("he-IL",{day:"numeric",month:"numeric"});
+  const pub=/עיר(?:י)?ית|עיריה|מועצה|ועד |ועד$|רשות|משרד|קק"ל|קרן קיימת|רכבת|אשכול|החברה ל|חברה לפיתוח|מתנ"ס|בית ספר|רשת חינוך|אוניברסיט|מכללה|בית חולים|קופת חולים|צה"ל|משטרה|נתיבי|נת"ע|מקורות|תאגיד/.test(o.customer||"");
+  const dep=Math.round(money(o)*0.35);
+  return {first,items,repTxt,dls,pub,dep,what:(items[0]||"").replace(/^[\d.]+×\s*/,"").slice(0,70)}}
+function qMsg(o){const q=qInfo(o);
+  return "שלום"+(q.first?" "+q.first:"")+",\n"+(q.repTxt?"בהמשך לתשובתך על הצעת המחיר ששלחנו ב-"+fmt(o.date)+" (מס' "+o.num+")"+(q.what?" ל"+q.what:"")+" – רציתי לבדוק אם הספקתם לבדוק ואם אפשר להתקדם.":"רציתי לוודא שהצעת המחיר ששלחנו ב-"+fmt(o.date)+" (מס' "+o.num+")"+(q.what?" ל"+q.what:"")+(o.orderTotal?", בסך "+o.orderTotal+" כולל מע\"מ":"")+", התקבלה, והאם תרצו להתקדם.")+
+  "\nאישור עד "+q.dls+" יאפשר לנו לשבץ את העבודה בסבב הייצור הקרוב. אם צריך שינוי במידות, בצבע או בכמות – נעדכן את ההצעה מיד.\n"+(q.pub?"להתקדמות נשמח לקבל הזמנת רכש / אישור חתום.":"להתקדמות: אישור ההצעה ומקדמה של 35%"+(q.dep?" (כ-"+q.dep.toLocaleString("he-IL")+" ₪)":"")+", ומיד נכניס את העבודה לייצור.")+"\nתודה,\nיניב כהן | ל.ש.מ מתכות | 03-9613415"}
+function qMsgHtml(o){const q=qInfo(o),e=t=>String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  const p="margin:0 0 12px 0;";
+  return '<div dir="rtl" style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#222;text-align:right">'+
+  '<p style="'+p+'">שלום'+(q.first?" "+e(q.first):"")+',</p>'+
+  (q.repTxt?'<p style="'+p+'">בהמשך לתשובתך על הצעת המחיר ששלחנו ב-'+e(fmt(o.date))+' – רציתי לבדוק אם הספקתם לבחון אותה ואם אפשר להתקדם.</p>'
+          :'<p style="'+p+'">רציתי לוודא שהצעת המחיר ששלחנו ב-'+e(fmt(o.date))+' התקבלה, ולשאול אם תרצו להתקדם.</p>')+
+  '<table role="presentation" style="border-collapse:collapse;margin:0 0 14px 0;background:#f4f6f9;border-right:4px solid #2f4a66"><tr><td style="padding:10px 14px">'+
+  '<div style="font-weight:bold;margin-bottom:4px">הצעת מחיר מס\' '+e(o.num)+(o.orderTotal?' · '+e(o.orderTotal)+' כולל מע"מ':'')+'</div>'+
+  (q.items.length?'<ul style="margin:0;padding:0 18px 0 0">'+q.items.map(x=>'<li>'+e(x)+'</li>').join("")+'</ul>':'')+'</td></tr></table>'+
+  '<p style="'+p+'"><b>אישור עד '+e(q.dls)+'</b> יאפשר לנו לשבץ את העבודה בסבב הייצור הקרוב. אם נדרש שינוי במידות, בצבע או בכמות – נעדכן את ההצעה מיד.</p>'+
+  (q.pub?'<p style="'+p+'">להתקדמות נשמח לקבל <b>הזמנת רכש או אישור חתום</b>, ומיד נכניס את העבודה לייצור ונתאם מועד אספקה.</p>'
+        :'<p style="'+p+'">להתקדמות: <b>אישור ההצעה ומקדמה של 35%</b>'+(q.dep?' (כ-'+q.dep.toLocaleString("he-IL")+' ₪)':'')+' – ומיד נכניס את העבודה לייצור ונתאם מועד אספקה. פרטי התשלום יישלחו עם האישור.</p>')+
+  '<p style="margin:16px 0 0 0">בברכה,<br><b>יניב כהן</b><br>ל.ש.מ מתכות בע"מ – ריהוט רחוב ומבנים<br>טל\' 03-9613415 | <a href="https://www.leshem-m.co.il" style="color:#2f4a66">www.leshem-m.co.il</a></p></div>'}
+async function copyRich(html,text){try{if(navigator.clipboard&&window.ClipboardItem){await navigator.clipboard.write([new ClipboardItem({"text/html":new Blob([html],{type:"text/html"}),"text/plain":new Blob([text],{type:"text/plain"})})]);return true}}catch(e){}
+  try{const d=document.createElement("div");d.contentEditable="true";d.innerHTML=html;d.style.cssText="position:fixed;left:-9999px;top:0";document.body.append(d);const r=document.createRange();r.selectNodeContents(d);const sel=getSelection();sel.removeAllRanges();sel.addRange(r);const ok=document.execCommand("copy");sel.removeAllRanges();d.remove();return ok}catch(e){return false}}
+function toast(t){const d=el("div",{class:"toast"},t);document.body.append(d);setTimeout(()=>d.remove(),6000)}
+function waLink(ph,txt){ph=String(ph||"").replace(/\D/g,"");if(!/^05\d{8}$/.test(ph))return null;return "https://wa.me/972"+ph.slice(1)+"?text="+encodeURIComponent(txt)}
+function qCard(o){const days=dAgo(o.date),msg=qMsg(o),wa=waLink(o.phone,msg),qThread=(o.links||[]).find(l=>!l.hidden&&l.type==="email"&&/^מייל הצעת מחיר/.test(l.title||"")&&l.url),mail=o.email||((qThread&&qThread.title.match(/נשלח ל-(\S+@\S+)/))||[])[1]||"";
+  const ccs=[...new Set((String(o.moreContacts||"")+" "+String(o.email||"")).match(/[\w.+-]+@[\w-]+\.[\w.-]+/g)||[])].filter(x=>x.toLowerCase()!==mail.toLowerCase());
+  const mailto="https://mail.google.com/mail/?authuser=lesheminfo@gmail.com&view=cm&fs=1&to="+encodeURIComponent(mail)+(ccs.length?"&cc="+encodeURIComponent(ccs.join(",")):"")+"&su="+encodeURIComponent("הצעת מחיר "+o.num+" – ל.ש.מ מתכות")+"&body="+encodeURIComponent(msg);
+  const sent=ch=>()=>{const n=new Date();n.setDate(n.getDate()+5);setTimeout(()=>save(o,{nextFollow:isoL(n)},"נשלחה ללקוח תזכורת על ההצעה ב"+ch),300)};
+  const lastNote=[...(o.log||[])].reverse().find(l=>l.by&&l.by!=="סנכרון");
+  const prev=el("div",{class:"qprev"});prev.innerHTML=qMsgHtml(o);
+  const box=el("div",{class:"qmsg",hidden:true},el("div",{class:"note"},"תצוגה של המייל (כך הוא יודבק):"),prev,el("div",{class:"qbtns"},el("button",{class:"btn",type:"button",onclick:async()=>{const ok=await copyRich(qMsgHtml(o),msg);toast(ok?"המייל המעוצב הועתק – הדבק (Ctrl+V) בתשובה":"לא הצלחתי להעתיק אוטומטית – סמן את הטקסט והעתק")}},"העתק מייל מעוצב"),el("button",{class:"btn",type:"button",onclick:async()=>{try{await navigator.clipboard.writeText(msg);toast("הנוסח לוואטסאפ הועתק")}catch(e){toast("סמן והעתק ידנית")}}},"העתק נוסח קצר")),el("textarea",{rows:6},msg));
+  const nIn=el("input",{placeholder:"מה קרה? למשל: דיברתי עם דני, מחכים לתקציב"}),nD=el("input",{type:"date",value:(()=>{const n=new Date();n.setDate(n.getDate()+7);return isoL(n)})()});
+  const nf=el("div",{class:"tedit",hidden:true},el("label",{},"עדכון"),nIn,el("label",{},"להזכיר לי ב-"),nD,el("div",{class:"tbtns"},el("button",{class:"btn primary",type:"button",onclick:()=>save(o,{nextFollow:nD.value},"מעקב הצעה: "+(nIn.value.trim()||"נוצר קשר"))},"שמור")));
+  const lIn=el("select",{},...["המחיר גבוה","בחרו מתחרה","הפרויקט בוטל / נדחה","אין תקציב","אחר"].map(x=>el("option",{value:x},x))),lN=el("input",{placeholder:"הערה (לא חובה)"});
+  const lf=el("div",{class:"tedit",hidden:true},el("label",{},"סיבה"),lIn,el("label",{},"הערה"),lN,el("div",{class:"tbtns"},el("button",{class:"btn primary",type:"button",onclick:()=>save(o,{stage:"quote_lost",stageUser:isoL(new Date())},"ההצעה ירדה: "+lIn.value+(lN.value.trim()?" – "+lN.value.trim():""))},"סמן שירדה")));
+  const cls=days>=10?"cold":days>=5?"warm":"new";
+  return el("div",{class:"qcard "+cls},
+    el("div",{class:"r1"},el("b",{},o.customer||""),el("span",{class:"num note"},"הצעה "+o.num+" · "+fmt(o.date)+" · "+(days===0?"היום":days+" ימים")),o.orderTotal?el("span",{class:"tag num"},o.orderTotal):null),
+    el("div",{class:"what"},[o.model,o.desc].filter(Boolean).join(" | ").slice(0,220)),
+    el("div",{class:"note"},[o.contact&&("איש קשר: "+o.contact),o.phone,o.email,o.address].filter(Boolean).join(" · ")||"אין פרטי איש קשר בהצעה"),
+    ...(o.flags||[]).map(f=>el("div",{class:"box b"},f)),
+    lastNote?el("div",{class:"note"},"עדכון אחרון: "+lastNote.text+" ("+new Date(lastNote.t).toLocaleDateString("he-IL")+", "+lastNote.by+")"):null,
+    o.nextFollow?el("div",{class:"note"},"תזכורת הבאה: "+fmt(o.nextFollow)):null,
+    el("div",{class:"qbtns"},
+      wa?el("a",{class:"btn",href:wa,target:"_blank",rel:"noopener",onclick:sent("וואטסאפ")},"וואטסאפ ללקוח"):null,
+      qThread?el("a",{class:"btn primary",href:qThread.url,target:"_blank",rel:"noopener",title:"מעתיק מייל מעוצב ופותח את מייל ההצעה – לוחצים 'השב' ו-Ctrl+V",onclick:()=>{copyRich(qMsgHtml(o),msg).then(ok=>toast(ok?"המייל המעוצב הועתק. במייל שנפתח: לחץ 'השב' ואז Ctrl+V":"פתחתי את המייל – העתק את הנוסח מ'הצג נוסח'"));sent("מייל (השבה בשרשור)")()}},"השב במייל ההצעה"):null,
+      el("a",{class:"btn",href:mailto,target:"_blank",rel:"noopener",onclick:sent("מייל")},mail?"מייל חדש ללקוח":"מייל ללקוח (להוסיף כתובת)"),
+      el("button",{class:"btn",type:"button",onclick:()=>{box.hidden=!box.hidden}},"הצג נוסח"),
+      el("button",{class:"btn",type:"button",onclick:()=>{nf.hidden=!nf.hidden}},"דיברתי / עדכון"),
+      el("button",{class:"btn",type:"button",onclick:()=>save(o,{stage:"quote_won",stageUser:isoL(new Date())},"ההצעה אושרה – התקבלה הזמנה")},"התקבלה הזמנה"),
+      el("button",{class:"btn",type:"button",onclick:()=>{lf.hidden=!lf.hidden}},"לא רלוונטית"),
+      el("button",{class:"btn",type:"button",onclick:()=>openSheet(o.id)},"כרטיס, הערות ומסמכים")),
+    nf,lf,box)}
+function qStatus(o,today){const d=dAgo(o.date);if(o.nextFollow&&o.nextFollow>today)return "snooze";if(d>45)return "old";if(d>=10)return "cold";if(d>=5)return "warm";return "new"}
+const QST={cold:"מתקררות – 10 ימים ומעלה, להתקשר או לשלוח תזכורת",warm:"לבדוק – 5 עד 9 ימים",new:"חדשות – עד 4 ימים",snooze:"ממתינות – כבר דיברת, תזכורת בהמשך",old:"ישנות – מעל 45 יום"};
+function renderQuotes(v,q){const today=isoL(new Date());
+  let L=S.quotes.filter(o=>S.qsel?S.qsel.has(o.id):o.stage==="quote");if(q)L=L.filter(o=>textHit(o,q));
+  const st=S.qst||"all",so=S.qsort||"group";
+  const counts={};L.forEach(o=>{const k=qStatus(o,today);counts[k]=(counts[k]||0)+1});
+  if(st!=="all")L=L.filter(o=>st==="maybe"?(o.flags||[]).length:qStatus(o,today)===st);
+  const SORTS={group:["לפי סטטוס",null],amount:["סכום – מהגבוה",(a,b)=>money(b)-money(a)],oldest:["הכי ותיקות קודם",(a,b)=>(a.date||"").localeCompare(b.date||"")],newest:["הכי חדשות קודם",(a,b)=>(b.date||"").localeCompare(a.date||"")],follow:["מועד תזכורת",(a,b)=>(a.nextFollow||"9").localeCompare(b.nextFollow||"9")],customer:["שם לקוח",(a,b)=>(a.customer||"").localeCompare(b.customer||"","he")]};
+  const sortSel=el("select",{"aria-label":"מיון"},...Object.entries(SORTS).map(([k,[l]])=>el("option",{value:k},"מיון: "+l)));sortSel.value=so;sortSel.onchange=()=>{S.qsort=sortSel.value;render()};
+  const chip=(k,l,n)=>el("button",{type:"button",class:"kpi"+(st===k?" on":""),style:"min-width:auto;padding:6px 10px",onclick:()=>{S.qst=st===k?"all":k;render()}},el("b",{class:"num"},n),el("span",{},l));
+  const won=S.quotes.filter(o=>o.stage==="quote_won").length,lost=S.quotes.filter(o=>o.stage==="quote_lost").length,sum=L.reduce((a,o)=>a+money(o),0);
+  const head=el("div",{class:"smartbar"},el("b",{},L.length+" הצעות"),el("span",{class:"note"},"סה\"כ "+Math.round(sum).toLocaleString("he-IL")+" ₪"),el("span",{class:"tag"},"התקבלו: "+won),el("span",{class:"tag"},"ירדו: "+lost),sortSel);
+  const chips=el("div",{class:"qbtns",style:"margin:0 0 10px"},chip("all","הכל",Object.values(counts).reduce((a,b)=>a+b,0)),chip("cold","מתקררות",counts.cold||0),chip("warm","לבדוק",counts.warm||0),chip("new","חדשות",counts.new||0),chip("snooze","ממתינות",counts.snooze||0),chip("old","ישנות",counts.old||0),chip("maybe","אולי הפכה להזמנה",S.quotes.filter(o=>o.stage==="quote"&&(o.flags||[]).length).length));
+  if(so!=="group"){v.replaceChildren(head,chips,...L.sort(SORTS[so][1]).map(qCard));return}
+  const by=(a,b)=>(a.date||"").localeCompare(b.date||"");
+  const g=["cold","warm","new","snooze","old"].map(k=>[QST[k],L.filter(o=>qStatus(o,today)===k).sort(k==="snooze"?(a,b)=>a.nextFollow.localeCompare(b.nextFollow):by)]);
+  const toOpen=S.quotes.filter(o=>o.stage==="quote_won"&&(o.flags||[]).some(f=>/^סימנת 'התקבלה הזמנה'/.test(f)));
+  v.replaceChildren(head,chips,
+    toOpen.length?el("details",{class:"qgrp",open:true},el("summary",{style:"color:#c0392b"},"אושרו ועדיין אין הזמנה ברווחית – לפתוח הזמנה ולגבות מקדמה ",el("span",{class:"cnt"},toOpen.length)),...toOpen.map(qCard)):null,
+    ...g.filter(x=>x[1].length).map(([t,list],i)=>el("details",{class:"qgrp",open:i<3||st!=="all"},el("summary",{},t+" ",el("span",{class:"cnt"},list.length)),...list.map(qCard))))}
+
+/* ---- חיפוש חכם: שאלות בעברית שמתורגמות לסינון מיידי ---- */
+function docs(o){const r=(o.links||[]).filter(l=>l.type==="rivhit"&&!l.hidden),dn=r.filter(l=>/^תעודת משלוח/.test(l.title||"")),inv=r.filter(l=>/^חשבונית/.test(l.title||""));
+  return {dn:dn.length,inv:inv.length,unpaid:inv.filter(l=>/טרם שולמה/.test(l.snippet||"")).length,paid:inv.filter(l=>/שולמה בקבלה/.test(l.snippet||"")).length,inRivhit:r.some(l=>/^הזמנה /.test(l.title||"")),mail:(o.links||[]).some(l=>l.type==="email"&&!l.hidden),call:(o.links||[]).some(l=>l.type==="call"&&!l.hidden)}}
+function money(o){return +(String(o.orderTotal||"").replace(/[^\d.]/g,""))||0}
+const NEG="(?:בלי|ללא|אין(?:\\s+להן|\\s+לה|\\s+עדיין)?|לא\\s+(?:יצא[הו]?|יצאו|הוצא[הו]?|הוצאו|הופק[הו]?|הופקו|קיבל[הו]?|קיימ[תות]+)(?:\\s+להן|\\s+לה)?|חסר[הות]*|טרם)";
+const KW={dn:"תעוד(?:ת|ות)\\s*משלוח|ת\"מ",inv:"חשבוני(?:ת|ות)(?:\\s*מס)?"};
+const MONTHS=["ינואר","פברואר","מרץ","אפריל","מאי","יוני","יולי","אוגוסט","ספטמבר","אוקטובר","נובמבר","דצמבר"];
+function parseQ(raw){let q=" "+raw.replace(/[?!,.]/g," ").replace(/\s+/g," ")+" ";const P=[],L=[];let scopeAll=false;
+  const take=re=>{const m=q.match(re);if(m){q=q.replace(re," ");return m}return null};
+  for(const k of ["dn","inv"]){const nm=k==="dn"?"תעודת משלוח":"חשבונית";
+    if(take(new RegExp(NEG+"\\s*(?:"+KW[k]+")"))||take(new RegExp("(?:"+KW[k]+")\\s*(?:לא\\s+(?:יצא[הו]?|הוצא[הו]?|הופק[הו]?)|טרם)"))){P.push(o=>!docs(o)[k]);L.push("בלי "+nm);scopeAll=true}
+    else if(take(new RegExp("(?:עם|יש(?:\\s+להן|\\s+לה)?|יצא[הו]?|הוצא[הו]?)?\\s*(?:"+KW[k]+")"))){P.push(o=>docs(o)[k]>0);L.push("יש "+nm);scopeAll=true}}
+  if(take(/(?:לא|טרם)\s+(?:שולמ[הו]?|שילמו|שילם)|(?:^|[^א-ת])חוב(?:ות)?(?![א-ת])|חייבים|לגבות|פתוח(?:ה|ות)?\s+לתשלום/)){P.push(o=>docs(o).unpaid>0);L.push("חשבונית שלא שולמה");scopeAll=true}
+  else if(take(/שולמ[הו]?|שולם|שילמו|שילם|(?:^|[^א-ת])קבל(?:ה|ות)(?![א-ת])|תקבול(?:ים)?/)){P.push(o=>docs(o).paid>0);L.push("שולמה");scopeAll=true}
+  if(take(/(?:לא\s+(?:נמצא[הו]?|קיימ[תות]+)|אין|בלי)\s*(?:להן\s*|לה\s*)?ב?רווחית/)){P.push(o=>!docs(o).inRivhit);L.push("לא ברווחית")}
+  if(take(/(?:בלי|ללא|אין)\s*(?:להן\s*|לה\s*)?מייל(?:ים)?/)){P.push(o=>!docs(o).mail);L.push("בלי מיילים")}else if(take(/(?:עם|יש)\s*מייל(?:ים)?/)){P.push(o=>docs(o).mail);L.push("עם מיילים")}
+  if(take(/שיחו?ת?\s*מוקלט|(?:עם|יש)\s*שיח(?:ה|ות)/)){P.push(o=>docs(o).call);L.push("עם שיחה מוקלטת")}
+  const ST=[[/בייצור|ייצור/,"prod"],[/בצבע|צביעה/,"paint"],[/ממתינ(?:ות|ה)?\s*(?:ל)?(?:חומר|ספק)?|ממתין\s*לחומר/,"material"],[/מוכנ(?:ות|ה)?(?:\s*לאספקה)?/,"ready"],[/חדשות|התקבלו/,"new"],[/(?:^|[^א-ת])[שוה]?סופק(?:ו|ה)?(?![א-ת])/,"delivered"],[/[שו]?(?:סגור(?:ות|ה)?|נסגר(?:ו|ה)?)/,"closed"],[/[שו]?בוטל(?:ו|ה)?|מבוטל(?:ות|ת)?/,"cancelled"]];
+  for(const[re,k]of ST)if(take(re)){P.push(o=>o.stage===k);L.push(stageL(k));if(k==="delivered"||k==="closed")scopeAll=true}
+  if(take(/פתוח(?:ות|ה)?/)){P.push(o=>OPEN.includes(o.stage)||o.stage==="quote"||o.stage==="lead");L.push("פתוחות")}
+  if(take(/חסר(?:ים|ות)?\s*(?:פרטים)?|לא\s+מלא(?:ות)?/)){P.push(o=>missing(o).length>0);L.push("חסרים פרטים")}
+  if(take(/דגל|לבדוק|סתיר(?:ה|ות)|בעי(?:ה|ות)/)){P.push(o=>(o.flags||[]).length>0);L.push("עם דגל לבדיקה")}
+  if(take(/באיחור|חורג(?:ות|ת)?|מאחר(?:ות)?/)){P.push(isLate);L.push("חורגות מזמן אספקה")}
+  let m,rng=null,rl="",dateIdx=null;const today=new Date(),iso=d=>isoL(d),ago=n=>{const d=new Date(today);d.setDate(d.getDate()-n);return iso(d)};
+  if(take(/(?:ב|מה?)?(?:חודש|30\s*(?:ה)?ימים)\s*(?:ה)?(?:אחרון|אחרונים)|(?:ב|מה?)?(?:ה)?חודש\s*האחרון/)){rng=[ago(30),"9999"];rl="ב-30 הימים האחרונים"}
+  else if(take(/(?:ב|מה?)?(?:ה)?שבוע\s*(?:ה)?אחרון|7\s*ימים/)){rng=[ago(7),"9999"];rl="בשבוע האחרון"}
+  else if(take(/(?:ב|מה?)?השבוע/)){const d=new Date(today);d.setDate(d.getDate()-d.getDay());rng=[iso(d),"9999"];rl="מהשבוע"}
+  else if(take(/(?:ב|מה?)?חודש\s*שעבר|(?:ב|מה?)?חודש\s*הקודם/)){rng=[iso(new Date(today.getFullYear(),today.getMonth()-1,1)),iso(new Date(today.getFullYear(),today.getMonth(),1))];rl="בחודש שעבר"}
+  else if(take(/(?:ב|מה?)?החודש/)){rng=[iso(new Date(today.getFullYear(),today.getMonth(),1)),"9999"];rl="מתחילת החודש"}
+  else if(take(/(?:ב|מה?)?היום/)){rng=[iso(today),"9999"];rl="היום"}
+  else if(m=take(new RegExp("(?:^|[^א-ת])(?:ב|מ)?("+MONTHS.join("|")+")(?![א-ת])(?:\\s*(\\d{4}))?"))){const mi=MONTHS.indexOf(m[1]);let y=+(m[2]||today.getFullYear());if(!m[2]&&mi>today.getMonth())y--;rng=[iso(new Date(y,mi,1)),iso(new Date(y,mi+1,1))];rl="ב"+m[1]+" "+y}
+  else if(m=take(/(?:מאז|מה?-?|החל\s*מ)\s*(\d{1,2})[./](\d{1,2})(?:[./](\d{2,4}))?/)){let y=m[3]?+m[3]:today.getFullYear();if(y<100)y+=2000;rng=[y+"-"+String(m[2]).padStart(2,"0")+"-"+String(m[1]).padStart(2,"0"),"9999"];rl="מ-"+m[1]+"."+m[2]}
+  if(rng){const docRe=L.includes("יש תעודת משלוח")?/^תעודת משלוח/:L.includes("יש חשבונית")||L.includes("חשבונית שלא שולמה")||L.includes("שולמה")?/^חשבונית/:null;
+    const inR=d=>d&&d>=rng[0]&&d<rng[1];
+    dateIdx=P.length;
+    if(docRe){P.push(o=>(o.links||[]).some(l=>l.type==="rivhit"&&!l.hidden&&docRe.test(l.title||"")&&inR(l.date)));L.push((docRe.source.includes("תעודת")?"תעודת משלוח ":"חשבונית ")+rl)}
+    else if(L.some(t=>/סופק|סגור/.test(t))){P.push(o=>inR(o.closedDate||o.date));L.push(rl)}
+    else{P.push(o=>inR(o.date));L.push("הזמנות "+rl)}
+    scopeAll=true}
+  if(m=take(/(?:מעל|יותר\s*מ-?|לפחות)\s*([\d,]+)\s*(?:אלף|א')?/)){let n=+m[1].replace(/,/g,"");if(/אלף|א'/.test(m[0]))n*=1000;P.push(o=>money(o)>=n);L.push("מעל "+n.toLocaleString("he-IL")+" ₪")}
+  if(m=take(/(?:מתחת\s*ל-?|פחות\s*מ-?|עד)\s*([\d,]+)\s*(?:אלף|א')?\s*(?:₪|ש"ח|שקל)/)){let n=+m[1].replace(/,/g,"");if(/אלף|א'/.test(m[0]))n*=1000;P.push(o=>money(o)<=n);L.push("עד "+n.toLocaleString("he-IL")+" ₪")}
+  const STOP=new Set("לאיזה לאילו איזה אילו אלו מה מי הזמנות הזמנה ההזמנות יש שיש להן לה של עם את כל תראה הראה תן רשימת רשימה תביא מצא חפש ו או גם עדיין כבר ש ה וגם אבל רק לי לנו שלנו כמה ₪ ש\"ח אחרון אחרונה אחרונים ימים איזה איזו שבהן שבה בהן מתוך שלהן עיריית עירית עיריה מועצה מקומית אזורית".split(" "));
+  const rest=q.split(" ").map(w=>w.replace(/^[וה](?=[א-ת]{3})/,"")).filter(w=>w.length>1&&!STOP.has(w)&&!STOP.has("ה"+w));
+  return {preds:P,labels:L,rest,scopeAll,smart:P.length>0,rng,dateIdx}}
+function textHit(o,w){return [o.num,o.customer,o.rivhitCustomer,o.model,o.desc,o.color,o.contact,o.phone,o.address,o.custPO,o.invoice,sup(o),(o.rivhitLines||[]).join(" "),(o.links||[]).filter(l=>l.type==="supplier"&&!l.hidden).map(l=>l.title).join(" ")].join(" ").includes(w)}
+function filt(list){const q=$("q").value.trim(),sp=$("fSupplier").value,dv=$("fDeliv").value,dd=dups(),pq=q?parseQ(q):null;
+  return list.filter(o=>{if(S.qsel&&!S.qsel.has(o.id))return false;if(pq&&pq.smart){if(!pq.preds.every(f=>f(o))||!pq.rest.every(w=>textHit(o,w)))return false}else if(q&&!textHit(o,q))return false;
+    if(sp&&!(o.suppliers||[]).some(s=>s.name===sp))return false;if(dv==="?"&&o.delivery)return false;if(dv&&dv!=="?"&&o.delivery!==dv)return false;
+    if(S.kpi==="miss"&&!missing(o).length)return false;if(S.kpi==="late"&&!isLate(o))return false;if(S.kpi==="flag"&&!(o.flags||[]).length)return false;if(S.kpi==="dup"&&!dd.has(o.num))return false;
+    if(STAGES.some(s=>s.k===S.kpi)&&o.stage!==S.kpi)return false;return true})}
+
+/* ---- תצוגה ---- */
+function selBar(n,sum){if(!S.qsel)return null;return el("div",{class:"smartbar"},el("b",{},"תוצאת השאלה: "+n),S.qlabel?el("span",{class:"tag"},S.qlabel):null,sum?el("span",{class:"note"},"סה\"כ "+nis(sum)):null,el("button",{class:"btn",type:"button",onclick:()=>{clearSel();render()}},"✕ נקה"))}
+function render(){
+  const open=S.orders.filter(o=>OPEN.includes(o.stage)),closed=S.orders.filter(o=>!OPEN.includes(o.stage));
+  const fs=$("fSupplier"),cur=fs.value;fs.replaceChildren(el("option",{value:""},"כל הספקים"),...[...new Set(S.orders.flatMap(o=>(o.suppliers||[]).map(s=>s.name)))].sort().map(n=>el("option",{value:n},n)));fs.value=cur;
+  const K=[["","הזמנות פתוחות",open.length],["prod","בייצור",open.filter(o=>o.stage==="prod").length],["paint","בצבע",open.filter(o=>o.stage==="paint").length],["material","ממתינות לספק",open.filter(o=>o.stage==="material").length],["ready","מוכנות לאספקה",open.filter(o=>o.stage==="ready").length],["miss","חסרים פרטים",open.filter(o=>missing(o).length).length,1],["flag","לבדוק מול רווחית",open.filter(o=>(o.flags||[]).length).length,1],["late","חורגות מזמן אספקה",open.filter(isLate).length,1]];
+  $("kpis").replaceChildren(...K.map(([k,l,n,a])=>el("button",{class:"kpi"+(a&&n?" alert":"")+(S.kpi===k&&k?" on":""),type:"button",onclick:()=>{S.kpi=S.kpi===k?"":k;if(k&&S.tab==="hist")S.tab="list";render()}},el("b",{class:"num"},n),el("span",{},l))));
+  for(const[id,t]of[["tabLeads","leads"],["tabList","list"],["tabBoard","board"],["tabQuotes","quotes"],["tabHist","hist"]])$(id).setAttribute("aria-selected",S.tab===t);
+  const v=$("view");
+  if(!S.orders.length){v.replaceChildren(el("div",{class:"empty"},"טוען הזמנות…"));return}
+  const q=$("q").value.trim();
+  $("today").replaceChildren(...todayStrip());
+  if(S.tab==="quotes"){renderQuotes(v,q);return}
+  if(S.tab==="leads"){renderLeads(v,q);return}
+  if(S.tab==="board"){const fo=filt(open);v.replaceChildren(el("div",{class:"lanes"},...OPEN.map(st=>{const it=fo.filter(o=>o.stage===st).sort((a,b)=>(a.date||"").localeCompare(b.date||""));return el("div",{class:"lane"},el("h3",{},stageL(st),el("span",{class:"num note"},it.length)),...it.map(card))})));}
+  else{const pq=q?parseQ(q):null;const base=S.tab==="hist"?closed:(q||S.qsel?S.orders:open);const list=filt(base).sort((a,b)=>S.tab==="hist"?(b.closedDate||b.date||"").localeCompare(a.closedDate||a.date||""):(b.date||"").localeCompare(a.date||""));
+    const sum=list.reduce((a,o)=>a+money(o),0);
+    v.replaceChildren(...[selBar(list.length,sum),pq&&pq.smart?el("div",{class:"smartbar"},el("b",{},"נמצאו "+list.length+" הזמנות"),pq.labels.map(t=>el("span",{class:"tag"},t)),pq.rest.length?el("span",{class:"tag"},"מכיל: "+pq.rest.join(" ")):null,sum?el("span",{class:"note"},"סה\"כ "+Math.round(sum).toLocaleString("he-IL")+" ₪"):null,S.tab==="hist"?el("span",{class:"note"},"(רק בהיסטוריה. בלשונית עץ הזמנות החיפוש על כל ההזמנות)"):null):null,
+      list.length?el("div",{class:"olist"},...list.map(row)):el("div",{class:"empty"},"אין הזמנות שמתאימות לסינון."),
+      S.tab==="hist"?el("p",{class:"note"},"סופק = יש תעודת משלוח מלאה ברווחית. סגור = סופק ושולם, או נסגר בחשבונית וקבלה."):null].filter(Boolean))}
+  if(S.sheet)drawSheet();
+}
+function tagsFor(o,withStage){const m=missing(o),late=isLate(o);return el("div",{class:"tags"},withStage?el("span",{class:"stg s-"+o.stage},stageL(o.stage)):null,ral(o.color),o.delivery?el("span",{class:"tag"},o.delivery):null,sup(o)?el("span",{class:"tag"},"ספק: "+sup(o)):null,o.orderTotal?el("span",{class:"tag num"},o.orderTotal):null,late?el("span",{class:"tag b"},daysSince(o.date)+" ימים"):null,OPEN.includes(o.stage)&&m.length?el("span",{class:"tag w"},"חסר: "+m.join(", ")):null,...(o.flags||[]).map(f=>el("span",{class:"tag b"},f)))}
+function cls(o){return (!OPEN.includes(o.stage)?" hist":(o.flags||[]).length?" flag":isLate(o)?" late":missing(o).length?" miss":"")}
+function card(o){return el("button",{class:"card"+cls(o),type:"button",onclick:()=>openSheet(o.id)},el("div",{class:"r1"},el("span",{class:"cust"},o.customer||"ללא שם"),el("span",{class:"num"},o.num||"")),el("div",{class:"what"},[o.qty,o.model,o.desc].filter(Boolean).join(" · ")),tagsFor(o,false))}
+function row(o){const isOpen=S.open===o.id;
+  return el("div",{class:"orow"+cls(o),"open-row":isOpen},
+    el("button",{class:"ohead",type:"button","aria-expanded":isOpen?"true":"false",onclick:()=>{S.open=isOpen?null:o.id;render()}},
+      el("span",{class:"car"},"◂"),
+      el("span",{class:"t1"},el("span",{class:"num"},o.num||"—"),el("span",{class:"cust"},o.customer||""),el("span",{class:"note"},fmt(o.date))),
+      el("span",{class:"stg s-"+o.stage},stageL(o.stage)),
+      el("span",{class:"what"},[o.qty,o.model,o.desc].filter(Boolean).join(" · ")),
+      tagsFor(o,false)),
+    isOpen?el("div",{class:"obody"},
+      el("div",{class:"note"},[o.contact&&("איש קשר: "+o.contact),o.phone,o.address&&("כתובת: "+o.address),o.fixing&&("קיבוע: "+o.fixing)].filter(Boolean).join(" · ")),
+      tree(o,true),
+      el("div",{},el("button",{class:"btn primary",type:"button",onclick:()=>openSheet(o.id)},"פתח כרטיס הזמנה ועדכון"))):null)}
+
+/* ---- עץ מסמכים ---- */
+function lkey(l){return l.k||((l.type||"")+"|"+(l.date||"")+"|"+(l.title||""))}
+const ROLES=["ספק חומר גלם","ספק מוצר / רכש","קבלן משנה","מתקין","הובלה","צביעה","אחר"];
+function items(o){const out=(o.links||[]).map((l,i)=>Object.assign({},l,{_i:i})).filter(l=>!l.hidden);
+  (o.sources||[]).forEach((s,i)=>out.push({type:s.type||(/מייל/.test(s.label||"")?"email":"file"),title:s.label,url:s.url,note:s.note,date:s.date,by:s.by,_src:i}));
+  (o.suppliers||[]).forEach((s,i)=>out.push({type:"supplier",date:s.date||"",title:(s.name||"")+(s.role?" · "+s.role:"")+(s.item?" · "+s.item:""),snippet:[s.status,s.price&&("מחיר: "+s.price)].filter(Boolean).join(" · "),note:s.note,by:s.by,_s:i}));return out}
+function removeItem(o,i){
+  if(i._s!=null){const a=[...(o.suppliers||[])],s=a[i._s];a.splice(i._s,1);save(o,{suppliers:a},"הוסר ספק: "+(s&&s.name||""))}
+  else if(i._src!=null){const a=[...(o.sources||[])],s=a[i._src];a.splice(i._src,1);save(o,{sources:a},"הוסר מהעץ: "+(s&&s.label||""))}
+  else{const a=[...(o.links||[])],l=a[i._i];a[i._i]=Object.assign({},l,{k:lkey(l),hidden:true,by:S.who});save(o,{links:a},"הוסר מהעץ: "+(l.title||""))}}
+function fld(lbl,inp){return [el("label",{},lbl),inp]}
+function editRow(o,i,isNew){const cancel=el("button",{class:"btn",type:"button",onclick:()=>render()},"ביטול");const today=isoL(new Date());
+  const btns=fn=>el("div",{class:"tbtns"},el("button",{class:"btn primary",type:"button",onclick:fn},"שמור"),cancel);
+  if(i.type==="supplier"){const s=isNew?{}:o.suppliers[i._s];
+    const n=el("input",{value:s.name||"",placeholder:"שם הספק / הקבלן / המתקין"}),ro=el("select",{},el("option",{value:""},"תפקיד…"),...ROLES.map(r=>el("option",{value:r},r)));ro.value=s.role||"";
+    const it=el("input",{value:s.item||"",placeholder:"מה הוזמן / מה בוצע"}),d=el("input",{type:"date",value:s.date||(isNew?today:"")}),pr=el("input",{value:s.price||"",placeholder:"לא חובה"}),st=el("input",{value:s.status||"",placeholder:"הוזמן / סופק / הותקן…"}),nt=el("textarea",{rows:2,placeholder:"הערה שלך"},s.note||"");
+    return el("div",{class:"tedit"},...fld("שם",n),...fld("תפקיד",ro),...fld("מה",it),...fld("תאריך",d),...fld("מחיר",pr),...fld("סטטוס",st),...fld("הערה",nt),btns(()=>{if(!n.value.trim())return;const a=[...(o.suppliers||[])];const v=Object.assign({},s,{name:n.value.trim(),role:ro.value,item:it.value.trim(),date:d.value,price:pr.value.trim(),status:st.value.trim(),note:nt.value.trim(),by:S.who});
+      if(isNew)a.push(v);else a[i._s]=v;save(o,{suppliers:a},(isNew?"נוסף ":"תוקן ")+(ro.value||"ספק")+": "+v.name+(v.item?" · "+v.item:"")+(v.note?" · "+v.note:""))}))}
+  if(i._src!=null){const s=o.sources[i._src],ti=el("input",{value:s.label||""}),u=el("input",{value:s.url||""}),nt=el("textarea",{rows:2,placeholder:"הערה שלך"},s.note||"");
+    return el("div",{class:"tedit"},...fld("כותרת",ti),...fld("קישור",u),...fld("הערה",nt),btns(()=>{const a=[...o.sources];a[i._src]=Object.assign({},s,{label:ti.value.trim(),url:u.value.trim(),note:nt.value.trim(),by:S.who});save(o,{sources:a},"תוקן בעץ: "+ti.value.trim())}))}
+  const l=isNew?{type:i.type,date:today}:o.links[i._i],ti=el("input",{value:l.title||"",placeholder:"כותרת"}),sn=el("textarea",{rows:2},l.snippet||""),nt=el("textarea",{rows:2,placeholder:"הערה שלך"},l.note||""),u=el("input",{value:l.url||"",placeholder:"קישור (לא חובה)"}),d=el("input",{type:"date",value:l.date||""}),ty=el("select",{},...TYPES.filter(t=>t.k!=="supplier").map(t=>el("option",{value:t.k},t.l)));ty.value=l.type;
+  return el("div",{class:"tedit"},...fld("סוג",ty),...fld("תאריך",d),...fld("כותרת",ti),...fld("מה נאמר / סוכם",sn),...fld("הערה",nt),...fld("קישור",u),btns(()=>{if(!ti.value.trim()&&!nt.value.trim())return;const a=[...(o.links||[])];
+    const v=Object.assign({},l,{type:ty.value,date:d.value,title:ti.value.trim()||nt.value.trim().slice(0,60),snippet:sn.value.trim(),note:nt.value.trim(),url:u.value.trim(),by:S.who||"עריכה ידנית",edited:today});
+    if(isNew)a.push(v);else{v.k=lkey(l);a[i._i]=v}
+    save(o,{links:a},(isNew?"נוסף לעץ: ":"תוקן בעץ: ")+v.title+(v.note?" · "+v.note:""))}))}
+const EMPTY={rivhit:o=>(o.flags||[]).some(f=>/לקוח אחר/.test(f))?"לא קושר: מספר ההזמנה שייך ברווחית ללקוח אחר. הכנס את המספר הנכון בשדה 'מספר ברווחית' בכרטיס ההזמנה.":(o.flags||[]).some(f=>/לא נמצאה/.test(f))?"ההזמנה לא נמצאה ברווחית. אם יש לה מספר אחר ברווחית, הכנס אותו בשדה 'מספר ברווחית'.":"אין עדיין מסמכים ברווחית להזמנה הזו.",
+  email:()=>"לא נמצאו מיילים על ההזמנה. אפשר להוסיף קישור ידנית.",whatsapp:()=>"אין טלפון של איש קשר. הוסף טלפון בכרטיס ההזמנה, ואז יופיע כאן קישור לצ'אט.",call:()=>"לא נמצאה שיחה מוקלטת עם איש הקשר של ההזמנה.",supplier:()=>"לא נרשמה הזמנה מספק.",file:()=>"אין עדיין קבצים."};
+function tree(o,openAll,editable=true){const it=items(o),ph=o.phone?String(o.phone).replace(/\D/g,""):"";
+  return el("div",{class:"tree"},...TYPES.map(T=>{const list=it.filter(i=>i.type===T.k).sort((a,b)=>(b.date||"").localeCompare(a.date||""));
+    const extra=T.k==="whatsapp"&&ph?[el("div",{class:"titem"},el("span",{class:"d"}),el("span",{class:"tt"},"פתח צ'אט עם "+(o.contact||ph)),el("a",{href:"https://wa.me/972"+ph.replace(/^0/,""),target:"_blank",rel:"noopener"},"וואטסאפ"))]:[];
+    const d=el("details",{class:list.length?"":"none"},el("summary",{},el("span",{class:"ty",style:"background:"+T.c}),T.l,el("span",{class:"cnt"},list.length)),
+      el("div",{class:"titems"},...list.map(i=>{const r=el("div",{class:"titem"},el("span",{class:"d"},fmt(i.date)),el("span",{class:"tt"},i.title||"",i.by?el("small",{class:"by"}," · עודכן ע\"י "+i.by):null),i.url?el("a",{href:i.url,target:"_blank",rel:"noopener"},T.k==="call"?"תמליל":T.k==="email"?"פתח מייל":"פתח"):el("span"),i.snippet?el("span",{class:"sn"},i.snippet):null,i.note?el("span",{class:"sn nt"},"הערה: "+i.note):null,
+          editable&&(i._i!=null||i._s!=null||i._src!=null)?el("span",{class:"ted"},el("button",{type:"button",class:"lnk",onclick:e=>{e.preventDefault();r.replaceWith(editRow(o,i))}},"ערוך"),el("button",{type:"button",class:"lnk",onclick:e=>{e.preventDefault();removeItem(o,i)}},"הסר")):null);return r}),...extra,
+        !list.length&&!extra.length?el("div",{class:"note",style:"padding:6px 0"},(EMPTY[T.k]||(()=>"אין עדיין פריטים."))(o)):null,
+        editable?el("div",{class:"tadd"},el("button",{type:"button",class:"lnk",onclick:e=>{e.preventDefault();e.currentTarget.parentNode.replaceWith(editRow(o,{type:T.k},true))}},T.k==="supplier"?"+ הוסף ספק / קבלן / מתקין":T.k==="file"?"+ הוסף קובץ או הערה":"+ הוסף פריט או הערה")):null));
+    if(openAll&&list.length)d.open=true;return d}))}
+
+/* ---- כרטיס הזמנה ---- */
+function openSheet(id){S.sheet=id;drawSheet()}
+function closeSheet(){S.sheet=null;$("sheetRoot").replaceChildren()}
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeSheet()});
+async function save(o,patch,text){try{const n=await run("updateOrder",S.pw,o.id,patch,text,S.who);S.orders=S.orders.filter(x=>x.id!==o.id);S.quotes=S.quotes.filter(x=>x.id!==o.id);S.leads=S.leads.filter(x=>x.id!==o.id);(isL(n)?S.leads:isQ(n)?S.quotes:S.orders).push(n);render()}catch(e){alertSync("השמירה נכשלה: "+e.message)}}
+function alertSync(t){$("sync").textContent=t}
+function drawSheet(){const o=S.orders.find(x=>x.id===S.sheet)||S.quotes.find(x=>x.id===S.sheet)||S.leads.find(x=>x.id===S.sheet);if(!o)return closeSheet();
+  const idx=STAGES.findIndex(s=>s.k===o.stage),m=missing(o);
+  const kv=p=>el("dl",{class:"kv"},...p.flatMap(([k,v])=>[el("dt",{},k),el("dd",{},v||"—")]));
+  const F=[["color","צבע"],["fixing","סוג קיבוע"],["delivery","הובלה / איסוף"],["address","כתובת אספקה"],["contact","איש קשר"],["phone","טלפון"],["qty","כמות"],["rivhitNum","מספר ברווחית (אם שונה)"]];
+  const ed=el("div",{class:"edit"},...F.flatMap(([f,l])=>{const id="f_"+f;const inp=f==="delivery"?el("select",{id},...["","הובלה","הובלה והתקנה","משלוח","איסוף עצמי"].map(x=>el("option",{value:x},x||"לא צוין"))):el("input",{id,value:o[f]||""});if(f==="delivery")inp.value=o.delivery||"";inp.addEventListener("change",()=>{const v=inp.value.trim();if(v!==(o[f]||""))save(o,{[f]:v},l+": "+(v||"נמחק"))});return[el("label",{for:id},l),inp]}));
+  const note=el("textarea",{id:"nn",placeholder:"עדכון או הערה, למשל: הוזמנו תחתיות מאופק"});
+  const sN=el("input",{id:"sN",placeholder:"שם הספק"}),sI=el("input",{id:"sI",placeholder:"מה הוזמן"});
+  const lT=el("select",{id:"lT"},...TYPES.map(t=>el("option",{value:t.k},t.l))),lD=el("input",{id:"lD",type:"date",value:isoL(new Date())}),lTi=el("input",{id:"lTi",placeholder:"כותרת"}),lU=el("input",{id:"lU",placeholder:"קישור (לא חובה)"});
+  $("sheetRoot").replaceChildren(el("div",{class:"scrim",onclick:closeSheet}),el("aside",{class:"sheet",role:"dialog","aria-label":"הזמנה "+o.num},
+    el("div",{class:"hd"},el("div",{},el("div",{class:"note num"},"הזמנה "+(o.num||"—")+(o.custPO?" · הזמנת לקוח "+o.custPO:"")+(o.orderTotal?" · "+o.orderTotal:"")),el("h2",{},o.customer||"")),el("button",{class:"btn",type:"button",onclick:closeSheet},"סגור")),
+    el("div",{class:"stepper"},...STAGES.map((s,i)=>el("button",{type:"button",class:i<idx?"done":i===idx?"cur":"",onclick:()=>{if(s.k!==o.stage)save(o,Object.assign({stage:s.k,stageUser:isoL(new Date())},s.k==="delivered"||s.k==="closed"?{closedDate:isoL(new Date())}:{}),"שלב שונה ל: "+s.l)}},s.l))),
+    ...(o.flags||[]).map(f=>el("div",{class:"box b"},el("b",{},"רווחית: "),f)),
+    OPEN.includes(o.stage)&&m.length?el("div",{class:"box"},"חסרים פרטים: ",el("b",{},m.join(", "))):null,
+    el("section",{class:"sec"},el("h3",{},"מסמכים והתכתבויות"),tree(o,false)),
+    (o.rivhitLines||[]).length?el("section",{class:"sec"},el("h3",{},"שורות ההזמנה ברווחית"),el("div",{class:"log"},...o.rivhitLines.map(t=>el("div",{},t)))):null,
+    el("section",{class:"sec"},el("h3",{},"המוצר"),kv([["דגם",o.model],["תיאור",o.desc],["כמות",o.qty],["צבע",o.color?ral(o.color):""],["קיבוע",o.fixing],["הערות",o.prodNotes]])),
+    el("section",{class:"sec"},el("h3",{},"אספקה ואנשי קשר"),kv([["אספקה",o.delivery],["כתובת",o.address],["איש קשר",o.contact],["טלפון",o.phone],["מייל",o.email],["נוספים",o.moreContacts],["תאריך הזמנה",fmt(o.date)],["מועד שהובטח",o.promised],["סופק / נסגר",fmt(o.closedDate)],["חשבונית",o.invoice]])),
+    el("section",{class:"sec"},el("h3",{},"עדכון פרטים"),ed),
+    el("section",{class:"sec"},el("h3",{},"הזמנה מספק"),el("div",{class:"edit"},el("label",{for:"sN"},"ספק"),sN,el("label",{for:"sI"},"מה הוזמן"),sI),el("button",{class:"btn",type:"button",style:"margin-top:6px",onclick:()=>{const n=sN.value.trim();if(!n)return;save(o,{suppliers:[...(o.suppliers||[]),{name:n,item:sI.value.trim(),status:"הוזמן "+new Date().toLocaleDateString("he-IL")}]},"הוזמן מספק "+n+(sI.value?": "+sI.value:""))}},"רשום הזמנה מספק")),
+    el("section",{class:"sec"},el("h3",{},"הוספת מסמך או התכתבות לעץ"),el("div",{class:"edit"},el("label",{for:"lT"},"סוג"),lT,el("label",{for:"lD"},"תאריך"),lD,el("label",{for:"lTi"},"כותרת"),lTi,el("label",{for:"lU"},"קישור"),lU),el("button",{class:"btn",type:"button",style:"margin-top:6px",onclick:()=>{const t=lTi.value.trim();if(!t)return;save(o,{links:[...(o.links||[]),{type:lT.value,date:lD.value,title:t,url:lU.value.trim()}]},"נוסף לעץ: "+t)}},"הוסף לעץ")),
+    el("section",{class:"sec"},el("h3",{},"יומן עדכונים"),note,el("button",{class:"btn primary",type:"button",style:"margin-top:6px",onclick:()=>{const t=note.value.trim();if(t)save(o,{},t)}},"הוסף עדכון"),
+      el("div",{class:"log",style:"margin-top:8px"},...[...(o.log||[])].reverse().map(l=>el("div",{},l.text,el("br"),el("small",{},new Date(l.t).toLocaleString("he-IL",{dateStyle:"short",timeStyle:"short"})+" · "+(l.by||"סנכרון"))))))))}
+
+$("q").addEventListener("input",()=>{clearSel();render()});["fSupplier","fDeliv"].forEach(id=>$(id).addEventListener("input",render));
+for(const[id,t]of[["tabLeads","leads"],["tabList","list"],["tabBoard","board"],["tabQuotes","quotes"],["tabHist","hist"]])$(id).addEventListener("click",()=>{S.tab=t;S.kpi="";render()});
+
+/* ---- הגדרות ---- */
+$("btnSettings").onclick=()=>{const g=el("input",{id:"sg",type:"password",placeholder:S.ai.gemini?"מוגדר. הדבק כדי להחליף":"הדבק מפתח מ-Google AI Studio"}),c=el("input",{id:"sc",type:"password",placeholder:S.ai.claude?"מוגדר. הדבק כדי להחליף":"הדבק מפתח מ-console.anthropic.com"}),p=el("select",{id:"sp2"},el("option",{value:""},"אוטומטי"),el("option",{value:"gemini"},"ג'מיני"),el("option",{value:"claude"},"Claude")),np=el("input",{id:"snp",placeholder:"השאר ריק כדי לא לשנות"}),msg=el("p",{class:"note"});p.value=S.ai.provider||"";
+  $("sheetRoot").replaceChildren(el("div",{class:"scrim",onclick:closeSheet}),el("aside",{class:"sheet",role:"dialog","aria-label":"הגדרות"},el("div",{class:"hd"},el("h2",{},"הגדרות"),el("button",{class:"btn",type:"button",onclick:closeSheet},"סגור")),
+    el("p",{class:"note"},"המפתחות נשמרים בשרת של גוגל בחשבון שלך ולא מוצגים לאף משתמש."),
+    el("div",{class:"edit"},el("label",{for:"sg"},"מפתח ג'מיני"),g,el("label",{for:"sc"},"מפתח Claude"),c,el("label",{for:"sp2"},"מי עונה כברירת מחדל"),p,el("label",{for:"snp"},"סיסמה חדשה לאתר"),np),
+    el("button",{class:"btn primary",type:"button",onclick:async()=>{try{S.ai=await run("saveSettings",S.pw,{geminiKey:g.value,claudeKey:c.value,provider:p.value,newPassword:np.value});if(np.value.length>=4){S.pw=np.value;store.set("lsm_pw",np.value)}msg.textContent="נשמר."}catch(e){msg.textContent="השמירה נכשלה: "+e.message}}},"שמור"),msg))};
+
+/* ---- עוזר קולי ---- */
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let rec=null,listening=false;
+function unlockTTS(){try{if(window.speechSynthesis){const u=new SpeechSynthesisUtterance(" ");u.volume=0;speechSynthesis.speak(u)}}catch(e){}}
+S.lastAns="";
+$("replayBtn").onclick=()=>{if(S.lastAns){const m=S.muted;S.muted=false;unlockTTS();speak(S.lastAns);S.muted=m}};
+$("fab").onclick=()=>{$("chat").hidden=false;unlockTTS();
+  if(IN_GOOGLE){$("chatIn").focus();if(!S.micHint){S.micHint=1;addMsg("a",/Android|iPhone|iPad/i.test(navigator.userAgent)?"לדבר: לחץ על סימן המיקרופון שבמקלדת של הטלפון ודבר. בסיום לחץ \"שלח\". את התשובה אקריא בקול (הכפתור ▶ מקריא שוב).":"לדבר במחשב: לחץ Windows+H והתחל לדבר, ואז Enter. בקישור של גוגל הדפדפן חוסם את המיקרופון של האתר עצמו. את התשובה אקריא בקול (הכפתור ▶ מקריא שוב).")}return}
+  if(!SR){$("chatIn").focus();addMsg("a","המיקרופון של הדפדפן לא זמין כאן. לחץ על סימן המיקרופון במקלדת של הטלפון ודבר, או הקלד.");return}
+  if(listening){rec&&rec.stop();return}
+  rec=new SR();rec.lang="he-IL";rec.interimResults=true;rec.maxAlternatives=1;
+  rec.onstart=()=>{listening=true;$("fab").classList.add("rec");$("chatIn").placeholder="מקשיב…"};
+  rec.onresult=e=>{let t="";for(const r of e.results)t+=r[0].transcript;$("chatIn").value=t;if(e.results[e.results.length-1].isFinal){rec.stop();send(t)}};
+  rec.onerror=e=>{addMsg("a",e.error==="not-allowed"||e.error==="service-not-allowed"?"הדפדפן לא מאפשר מיקרופון בדף הזה. לחץ על סימן המיקרופון במקלדת של הטלפון ודבר, או הקלד.":"לא שמעתי טוב. נסה שוב.")};
+  rec.onend=()=>{listening=false;$("fab").classList.remove("rec");$("chatIn").placeholder="הקלד שאלה, או לחץ על המיקרופון"};
+  try{rec.start()}catch(e){}};
+$("chatX").onclick=()=>{$("chat").hidden=true;speechSynthesis&&speechSynthesis.cancel()};
+$("muteBtn").onclick=()=>{S.muted=!S.muted;$("muteBtn").textContent=S.muted?"🔇":"🔊";if(S.muted&&window.speechSynthesis)speechSynthesis.cancel()};
+$("chatForm").addEventListener("submit",e=>{e.preventDefault();unlockTTS();const t=$("chatIn").value.trim();if(t)send(t)});
+function addMsg(r,t,sub){const m=el("div",{class:"m "+r},t,sub?el("small",{},sub):null);$("msgs").append(m);$("msgs").scrollTop=1e6;return m}
+/* ---- מנוע שאילתות: שאלה → תוכנית (מקומית או מהמודל) → חישוב על הנתונים → תשובה ---- */
+const AMT=t=>+(((String(t||"").match(/([\d,]+)\s*₪/)||[])[1]||"").replace(/,/g,""))||0;
+function rdocs(o){const r=(o.links||[]).filter(l=>l.type==="rivhit"&&!l.hidden);
+  return {dn:r.filter(l=>/^תעודת משלוח/.test(l.title||"")).map(l=>({date:l.date||"",amt:AMT(l.title)})),
+    inv:r.filter(l=>/^חשבונית/.test(l.title||"")).map(l=>({date:l.date||"",amt:AMT(l.title),paid:/שולמה בקבלה/.test(l.snippet||""),rec:[...String(l.snippet||"").matchAll(/\((\d{4}-\d{2}-\d{2})\)/g)].map(m=>m[1])}))}}
+const DATE_F={order:"תאריך ההזמנה",dn:"תאריך תעודת המשלוח",inv:"תאריך החשבונית",receipt:"תאריך התשלום (קבלה)",closed:"תאריך הסגירה",promised:"מועד האספקה שהובטח"};
+function datesOf(o,f){const d=f==="dn"||f==="inv"||f==="receipt"?rdocs(o):null;
+  return f==="dn"?d.dn.map(x=>x.date):f==="inv"?d.inv.map(x=>x.date):f==="receipt"?d.inv.flatMap(x=>x.rec):f==="closed"?[o.closedDate].filter(Boolean):f==="promised"?[o.promised].filter(Boolean):[o.date].filter(Boolean)}
+/* סכום רלוונטי לשורה: לפי מסמכים בטווח (ת"מ / חשבונית / קבלה) או סכום ההזמנה */
+function amountOf(o,f,inR){if(f==="dn")return rdocs(o).dn.filter(x=>inR(x.date)).reduce((a,x)=>a+x.amt,0);
+  if(f==="inv")return rdocs(o).inv.filter(x=>inR(x.date)).reduce((a,x)=>a+x.amt,0);
+  if(f==="receipt")return rdocs(o).inv.filter(x=>x.rec.some(inR)).reduce((a,x)=>a+x.amt,0);
+  return money(o)}
+const norm=w=>String(w||"").trim().replace(/^(?:עיריית|עירית|עיריה|מועצה\s+(?:מקומית|אזורית)|מ\.מ\.?|מ\.א\.?|חברת|קיבוץ|מושב)\s+/,"").replace(/["'״׳]/g,"");
+function hitLoose(o,w){w=norm(w);if(!w)return true;if(textHit(o,w))return true;const ws=w.split(/\s+/).filter(x=>x.length>2);return ws.length>0&&ws.every(x=>textHit(o,x)||textHit(o,x.replace(/^[והבלמשכ]/,"")))}
+const nis=n=>Math.round(n).toLocaleString("he-IL")+" ₪";
+const KIND_L={orders:["הזמנה","הזמנות"],quotes:["הצעת מחיר","הצעות מחיר"],leads:["פנייה","פניות"]};
+function execPlan(p){
+  p=Object.assign({kind:"orders",metric:"list",limit:8},p||{});
+  const kind=p.kind==="quotes"?"quotes":p.kind==="leads"?"leads":"orders",KL=KIND_L[kind];
+  const preds=(p.preds||[]).slice(),labels=(p.labels||[]).slice();
+  if(Array.isArray(p.stages)&&p.stages.length){const st=p.stages;preds.push(o=>st.includes(o.stage));labels.push(st.map(stageL).join(" / "))}
+  else if(p.stages==="open"){preds.push(o=>OPEN.includes(o.stage)||o.stage==="quote"||o.stage==="lead");labels.push("פתוחות")}
+  else if(p.stages==="history"){preds.push(o=>o.stage==="delivered"||o.stage==="closed"||/_(won|lost|done)$/.test(o.stage||""));labels.push("היסטוריה")}
+  const words=(p.text||[]).map(norm).filter(Boolean);words.forEach(w=>{if(/^\d{3,6}$/.test(w)&&S[kind].some(o=>String(o.num)===w||String(o.rivhitNum)===w))preds.push(o=>String(o.num)===w||String(o.rivhitNum)===w);else preds.push(o=>hitLoose(o,w))});if(words.length)labels.push("מכיל: "+words.join(" "));
+  if(p.supplier){const s=norm(p.supplier);preds.push(o=>(o.suppliers||[]).some(x=>String(x.name||"").includes(s))||sup(o).includes(s));labels.push("ספק: "+s)}
+  const D=p.docs||{};
+  if(D.dn===true){preds.push(o=>docs(o).dn>0);labels.push("יש תעודת משלוח")}else if(D.dn===false){preds.push(o=>!docs(o).dn);labels.push("בלי תעודת משלוח")}
+  if(D.inv===true){preds.push(o=>docs(o).inv>0);labels.push("יש חשבונית")}else if(D.inv===false){preds.push(o=>!docs(o).inv);labels.push("בלי חשבונית")}
+  if(D.paid===true){preds.push(o=>docs(o).paid>0);labels.push("שולמה")}else if(D.paid===false){preds.push(o=>docs(o).unpaid>0);labels.push("חשבונית שלא שולמה")}
+  if(D.inRivhit===false){preds.push(o=>!docs(o).inRivhit);labels.push("לא ברווחית")}else if(D.inRivhit===true)preds.push(o=>docs(o).inRivhit);
+  if(D.email===true){preds.push(o=>docs(o).mail);labels.push("עם מיילים")}else if(D.email===false){preds.push(o=>!docs(o).mail);labels.push("בלי מיילים")}
+  if(D.call===true){preds.push(o=>docs(o).call);labels.push("עם שיחה מוקלטת")}
+  if(p.late){preds.push(isLate);labels.push("חורגות מזמן אספקה")}
+  if(p.missing){preds.push(o=>missing(o).length>0);labels.push("חסרים פרטים")}
+  if(p.flags){preds.push(o=>(o.flags||[]).length>0);labels.push("עם דגל לבדיקה")}
+  if(p.minTotal!=null&&p.minTotal!==""){const n=+p.minTotal;preds.push(o=>money(o)>=n);labels.push("מעל "+nis(n))}
+  if(p.maxTotal!=null&&p.maxTotal!==""){const n=+p.maxTotal;preds.push(o=>money(o)<=n);labels.push("עד "+nis(n))}
+  let f="order",inR=null;
+  if(p.date&&(p.date.from||p.date.to)){f=DATE_F[p.date.field]?p.date.field:"order";const a=p.date.from||"0000",b=p.date.to||"9999";inR=d=>!!d&&d>=a&&d<=b;
+    preds.push(o=>datesOf(o,f).some(inR));labels.push(DATE_F[f]+" "+fmt(a)+(p.date.to?" – "+fmt(b):" ואילך"))}
+  if(inR&&p.date.field==="receipt"&&D.paid==null)labels.push("שולמו");
+  let rows=S[kind].filter(o=>preds.every(fn=>fn(o)));
+  const amt=o=>inR?amountOf(o,f,inR):money(o);
+  const key=p.sort==="total_desc"?(a,b)=>amt(b)-amt(a):p.sort==="total_asc"?(a,b)=>amt(a)-amt(b):p.sort==="date_asc"?(a,b)=>(a.date||"").localeCompare(b.date||""):(a,b)=>(b.closedDate||b.date||"").localeCompare(a.closedDate||a.date||"");
+  rows.sort(key);
+  const lim=Math.max(3,Math.min(+p.limit||8,20)),lab=p.label||labels.join(", "),n=rows.length,sum=rows.reduce((a,o)=>a+amt(o),0);
+  const name=o=>(o.num?o.num+" ":"")+(o.customer||"ללא שם");
+  const few=rows.slice(0,lim).map(o=>name(o)+(amt(o)?" ("+nis(amt(o))+")":"")).join(", ")+(n>lim?" ועוד "+(n-lim):"");
+  const cnt=n===1?KL[0]+" אחת":n+" "+KL[1];
+  let text,head;
+  if(!n){head=text="לא מצאתי "+KL[1]+(lab?" ("+lab+")":"")+".";}
+  else if(p.metric==="count"){head=cnt+(lab?" – "+lab:"")+".";text=head+(sum?" סה\"כ "+nis(sum)+".":"")+" "+few}
+  else if(p.metric==="sum"||p.metric==="avg"){const v=p.metric==="avg"?sum/n:sum;head=(p.metric==="avg"?"ממוצע ":"סה\"כ ")+nis(v)+" ב-"+cnt+(lab?" ("+lab+")":"")+".";text=head+(inR?" החישוב לפי "+DATE_F[f]+(f==="order"?" (סכומי ההזמנות שנפתחו, לא תשלומים)":"")+".":"")+" "+(p.metric==="avg"?"":"הגדולות: ")+rows.slice().sort((a,b)=>amt(b)-amt(a)).slice(0,5).map(o=>name(o)+" "+nis(amt(o))).join(", ")}
+  else if(p.metric==="group"&&p.groupBy){const G={};const gk=o=>p.groupBy==="month"?(o.date||"").slice(0,7):p.groupBy==="stage"?stageL(o.stage):p.groupBy==="supplier"?(sup(o)||"ללא ספק"):p.groupBy==="color"?(o.color||"ללא צבע"):p.groupBy==="delivery"?(o.delivery||"לא צוין"):(o.customer||"ללא שם");
+    rows.forEach(o=>{const k=gk(o);G[k]=G[k]||{n:0,s:0};G[k].n++;G[k].s+=amt(o)});const gs=Object.entries(G).sort((a,b)=>b[1].s-a[1].s||b[1].n-a[1].n);
+    head=cnt+(lab?" ("+lab+")":"")+", לפי "+({customer:"לקוח",stage:"שלב",month:"חודש",supplier:"ספק",color:"צבע",delivery:"אספקה"}[p.groupBy]||p.groupBy)+".";
+    text=head+" "+gs.slice(0,lim).map(([k,v])=>k+": "+v.n+(v.s?" ("+nis(v.s)+")":"")).join("; ")+(gs.length>lim?" ועוד "+(gs.length-lim):"")}
+  else{head="מצאתי "+cnt+(lab?" ("+lab+")":"")+(sum?" בסך "+nis(sum):"")+".";text=head+" "+few}
+  return {rows,text,head,label:lab,kind,n,sum,field:f}}
+/* תוכנית מקומית (בלי מודל) מתוך parseQ: מספיקה לרוב השאלות הנפוצות, ועונה מיד */
+const NOISE=/^(?:[ומשבלכה]{0,2})(?:שולם|שילם|כסף|נכנס(?:ו|ה)?|התקבל(?:ו|ה)?|נפתח(?:ו|ה)?|סכום|סה"?כ|מחזור|שווי|תקבול(?:ים)?|גבי(?:ה|נו|תי)|שולמ[הו]?|שילמ[הו]?|קבל(?:ה|ות)|ממוצע|יצא[הו]?|הוצא[הו]?|הופק[הו]?|בסך|מצב|סטטוס|לקוח(?:ות)?|מוצר(?:ים)?|עסק(?:ה|אות)?|פרטים|כולל|מכר(?:נו|תי)?|מכירות|הכנסות|תסביר|תסכם|סכם|למה|מדוע|דעתך|כדאי|לעשות|קרה|אמר|ביקש|בעיה|תראה|תגיד|לפי|הצע(?:ה|ות)|צע(?:ה|ות)|מחיר|פני(?:ה|ות|יה|יות)|ליד(?:ים)?|הזמנ(?:ה|ות)|זמנ(?:ה|ות)|חודש|שבוע|שנה|היום|אתמול)$/;
+function localPlan(raw){const q=" "+raw+" ";const pq=parseQ(raw);
+  const p={preds:pq.preds.slice(),labels:pq.labels.slice(),kind:/הצע(?:ה|ות)/.test(q)?"quotes":/פני(?:ה|ות|יה|יות)|לידי?ם?|\sליד\s/.test(q)?"leads":"orders",metric:"list"};
+  if(/כמה\s+כסף|סכום|סה["”]?כ|מחזור|שווי|בכמה|כמה\s+שילמ|כמה\s+שולם|כמה\s+נכנס|הכנסות|מכירות|מכר(?:נו|תי)/.test(q))p.metric="sum";else if(/כמה\s+(?:הזמנות|הצעות|פניות|לקוחות)|מספר\s+ה/.test(q))p.metric="count";
+  if(/ממוצע/.test(q))p.metric="avg";
+  if(/לפי\s+לקוח/.test(q)){p.metric="group";p.groupBy="customer"}else if(/לפי\s+חודש/.test(q)){p.metric="group";p.groupBy="month"}else if(/לפי\s+ספק/.test(q)){p.metric="group";p.groupBy="supplier"}
+  if(pq.rng){if(pq.dateIdx!=null){p.preds.splice(pq.dateIdx,1);p.labels.splice(pq.dateIdx,1)}
+    let f="order";const L=pq.labels;
+    if(L.includes("חשבונית שלא שולמה"))f="inv";else if(/תקבול|גבי(?:ה|נו|תי)|שולמ|שולם|שילמ|שילם|קבלה|קבלות|הכנסות|תשלומ/.test(q)||(/נכנס(?:ו|ה)?\s+כסף|כסף\s+נכנס|כסף\s+שנכנס/.test(q)&&!/הזמנ/.test(q)))f="receipt";else if(L.includes("יש חשבונית")||L.includes("שולמה"))f="inv";else if(L.includes("יש תעודת משלוח")||L.includes("סופק"))f="dn";else if(L.includes("חשבונית / סגור"))f="closed";
+    p.date={field:f,from:pq.rng[0],to:pq.rng[1]==="9999"?null:isoL(new Date(new Date(pq.rng[1]+"T00:00:00").getTime()-864e5))};if(f==="receipt"&&!L.includes("חשבונית שלא שולמה")&&!L.includes("שולמה"))p.docs={paid:true}}
+  p.text=pq.rest.filter(w=>!NOISE.test(w));p.smart=pq.smart||p.metric!=="list"||(p.text.length>0&&!!p.kind);
+  p.needsAI=/למה|מדוע|מה\s+(?:קרה|אמר|ביקש|הבעיה|המצב)|מה\s+לעשות|תסביר|סכם|תסכם|האם\s+כדאי|מה\s+דעתך|איך|מתי\s+(?:הבטחנו|צריך)/.test(q);
+  return p}
+function rowTxt(o){const d=docs(o),r=rdocs(o);
+  return [(isQ(o)?"הצעה ":isL(o)?"פנייה ":"הזמנה ")+(o.num||""),"לקוח: "+(o.customer||""),"תאריך: "+(o.date||""),"שלב: "+stageL(o.stage),"מוצר: "+[o.qty,o.model,o.desc].filter(Boolean).join(" "),o.color&&"צבע: "+o.color,o.delivery&&"אספקה: "+o.delivery,o.address&&"כתובת: "+o.address,(o.contact||o.phone)&&"איש קשר: "+[o.contact,o.phone].filter(Boolean).join(" "),o.orderTotal&&"סכום: "+o.orderTotal,o.custPO&&"הזמנת לקוח: "+o.custPO,o.closedDate&&"סופק/נסגר: "+o.closedDate,o.promised&&"הובטח: "+o.promised,
+    sup(o)&&"ספקים: "+(o.suppliers||[]).map(s=>[s.name,s.role,s.item,s.status].filter(Boolean).join(" ")).join(", "),(o.flags||[]).length&&"לבדוק: "+o.flags.join("; "),(o.rivhitLines||[]).length&&"שורות: "+o.rivhitLines.slice(0,6).join("; "),
+    "תעודות משלוח: "+(r.dn.length?r.dn.map(x=>x.date+" "+nis(x.amt)).join(", "):"אין"),"חשבוניות: "+(r.inv.length?r.inv.map(x=>x.date+" "+nis(x.amt)+(x.paid?" שולמה "+x.rec.join(","):" לא שולמה")).join(", "):"אין"),
+    o.prodNotes&&"הערות: "+String(o.prodNotes).slice(0,300),(o.links||[]).filter(l=>!l.hidden&&l.type!=="rivhit").slice(-5).map(l=>(l.date||"")+" "+(l.title||"")+(l.snippet?": "+String(l.snippet).slice(0,160):"")).join(" | "),(o.log||[]).slice(-3).map(l=>(l.t||"").slice(0,10)+" "+(l.by?l.by+": ":"")+l.text).join(" | ")].filter(Boolean).join(" · ")}
+function showResult(res){S.qsel=new Set(res.rows.map(o=>o.id));S.qlabel=res.label||"";S.kpi="";S.qst="all";$("q").value="";
+  S.tab=res.kind==="quotes"?"quotes":res.kind==="leads"?"leads":(res.rows.length&&res.rows.every(o=>!OPEN.includes(o.stage))?"hist":"list");render()}
+function clearSel(){if(S.qsel){S.qsel=null;S.qlabel=""}}
+async function send(t){$("chatIn").value="";addMsg("u",t);const t0=Date.now();
+  let p=localPlan(t),res=null,src="מהנתונים בדשבורד";
+  const useAI=!!(S.ai&&(S.ai.gemini||S.ai.claude)),secs=()=>" · "+((Date.now()-t0)/1000).toFixed(1)+" שנ'";
+  try{res=execPlan(p)}catch(e){res=null}
+  const weak=!res||!res.n||(!p.preds.length&&!p.date&&p.metric==="list"&&!p.needsAI&&res.n>40);
+  if(useAI&&(!p.smart||weak)){const w=addMsg("a","מבין את השאלה…");
+    try{const r=await run("plan",S.pw,t,S.hist,$("prov").value);const ap=r.plan||{};
+      if(ap.kind||ap.stages||(ap.text&&ap.text.length)||ap.date||ap.docs||ap.metric){const np=Object.assign({},ap,{preds:[],labels:[],text:ap.text||[],needsAI:!!ap.needsAI||p.needsAI});const r2=execPlan(np);if(r2.n||!res||!res.n){p=np;res=r2}}
+      else if(ap.needsAI)p.needsAI=true;
+      src=(r.provider==="gemini"?"ג'מיני":"Claude")+" + הנתונים"}
+    catch(e){src="מהנתונים בדשבורד (המודל לא זמין: "+e.message+")"}
+    w.remove()}
+  if(res&&!p.needsAI){addMsg("a",res.text,src+secs());S.lastAns=res.head;speak(res.head);S.hist=S.hist.concat([{role:"user",content:t},{role:"assistant",content:res.text}]).slice(-6);if(res.n)showResult(res);return}
+  if(!useAI){addMsg("a",res&&res.text?res.text:"לא מצאתי. נסה לנסח אחרת, למשל: 'הזמנות של נס ציונה' או 'תעודת משלוח בלי חשבונית'.");if(res&&res.n)showResult(res);return}
+  const w=addMsg("a","חושב…");
+  const base=res&&res.n?res.rows:null;
+  const facts=base?(res.head+"\n"+base.slice(0,25).map(rowTxt).join("\n")):"";
+  try{const r=await run("ask",S.pw,t,S.hist,$("prov").value,facts);w.replaceWith(addMsg("a",r.answer,(r.provider==="gemini"?"ג'מיני":"Claude")+(base?" · לפי "+Math.min(base.length,25)+" מתוך "+base.length+" רשומות":" · לפי כל הנתונים")+secs()));S.hist=S.hist.concat([{role:"user",content:t},{role:"assistant",content:r.answer}]).slice(-6);S.lastAns=r.answer;speak(r.answer);if(base)showResult(res)}
+  catch(e){w.textContent=e.message}}
+function speak(t){if(S.muted||!window.speechSynthesis)return;try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang="he-IL";const v=speechSynthesis.getVoices().find(x=>/he|iw/i.test(x.lang));if(v)u.voice=v;speechSynthesis.speak(u)}catch(e){}}
+</script>
+</body>
+</html>
