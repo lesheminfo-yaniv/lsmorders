@@ -575,13 +575,32 @@ $("replayBtn").onclick=()=>{if(S.lastAns){const m=S.muted;S.muted=false;unlockTT
 $("fab").onclick=()=>{$("chat").hidden=false;unlockTTS();
   if(IN_GOOGLE){$("chatIn").focus();if(!S.micHint){S.micHint=1;addMsg("a",/Android|iPhone|iPad/i.test(navigator.userAgent)?"לדבר: לחץ על סימן המיקרופון שבמקלדת של הטלפון ודבר. בסיום לחץ \"שלח\". את התשובה אקריא בקול (הכפתור ▶ מקריא שוב).":"לדבר במחשב: לחץ Windows+H והתחל לדבר, ואז Enter. בקישור של גוגל הדפדפן חוסם את המיקרופון של האתר עצמו. את התשובה אקריא בקול (הכפתור ▶ מקריא שוב).")}return}
   if(!SR){$("chatIn").focus();addMsg("a","המיקרופון של הדפדפן לא זמין כאן. לחץ על סימן המיקרופון במקלדת של הטלפון ודבר, או הקלד.");return}
-  if(listening){rec&&rec.stop();return}
-  rec=new SR();rec.lang="he-IL";rec.interimResults=true;rec.maxAlternatives=1;
-  rec.onstart=()=>{listening=true;$("fab").classList.add("rec");$("chatIn").placeholder="מקשיב…"};
-  rec.onresult=e=>{let t="";for(const r of e.results)t+=r[0].transcript;$("chatIn").value=t;if(e.results[e.results.length-1].isFinal){rec.stop();send(t)}};
-  rec.onerror=e=>{addMsg("a",e.error==="not-allowed"||e.error==="service-not-allowed"?"הדפדפן לא מאפשר מיקרופון בדף הזה. לחץ על סימן המיקרופון במקלדת של הטלפון ודבר, או הקלד.":"לא שמעתי טוב. נסה שוב.")};
-  rec.onend=()=>{listening=false;$("fab").classList.remove("rec");$("chatIn").placeholder="הקלד שאלה, או לחץ על המיקרופון"};
-  try{rec.start()}catch(e){}};
+  if(listening){finishVoice();return}   // לחיצה נוספת = סיימתי, שלח עכשיו
+  V={done:"",sess:"",want:true,timer:0};startRec()};
+/* האזנה רציפה: לא שולחים בהפסקה קצרה. שולחים אחרי SILENCE של שקט, במילה "זהו/שלח", או בלחיצה על המיקרופון */
+const SILENCE=3500;let V=null;
+const END_RX=/\s*(זהו|זה הכל|זה הכול|סיימתי|שלח|תשלח)[.!?\s]*$/;
+function vText(){return (V.done+" "+V.sess).replace(/\s+/g," ").trim()}
+function vStatus(t){$("chatIn").placeholder=t}
+function armTimer(){clearTimeout(V.timer);if(vText())V.timer=setTimeout(finishVoice,SILENCE)}
+function startRec(){rec=new SR();rec.lang="he-IL";rec.interimResults=true;rec.continuous=true;rec.maxAlternatives=1;V.sess="";
+  rec.onstart=()=>{listening=true;$("fab").classList.add("rec");vStatus("מקשיב… קח את הזמן. לסיום: שתוק 3 שניות, תגיד \"זהו\" או לחץ שוב על המיקרופון")};
+  rec.onresult=e=>{let fin="",tmp="";
+    for(let i=0;i<e.results.length;i++){const x=e.results[i][0].transcript.trim();if(!x)continue;
+      if(e.results[i].isFinal){fin=fin&&x.indexOf(fin)===0?x:(fin?fin+" "+x:x)}else tmp=tmp?tmp+" "+x:x}  // באנדרואיד תוצאות חוזרות מצטברות: לא מכפילים
+    V.sess=(fin+" "+tmp).trim();$("chatIn").value=vText();
+    if(END_RX.test(vText())){V.sess=V.sess.replace(END_RX,"");if(!END_RX.test(V.done))return finishVoice()}
+    armTimer()};
+  rec.onerror=e=>{if(e.error==="no-speech"||e.error==="aborted")return;V.want=false;
+    addMsg("a",e.error==="not-allowed"||e.error==="service-not-allowed"?"הדפדפן לא מאפשר מיקרופון בדף הזה. לחץ על סימן המיקרופון במקלדת של הטלפון ודבר, או הקלד.":"לא שמעתי טוב. נסה שוב.")};
+  rec.onend=()=>{V.done=vText();V.sess="";   // הדפדפן עוצר לבד אחרי הפסקה: ממשיכים להקשיב עד שהשאלה הסתיימה
+    if(V.want){try{rec.start();return}catch(e){}}
+    listening=false;$("fab").classList.remove("rec");vStatus("הקלד שאלה, או לחץ על המיקרופון")};
+  try{rec.start()}catch(e){}}
+function finishVoice(){if(!V)return;clearTimeout(V.timer);V.want=false;const t=vText().replace(END_RX,"").trim();
+  try{rec&&rec.stop()}catch(e){}
+  listening=false;$("fab").classList.remove("rec");vStatus("הקלד שאלה, או לחץ על המיקרופון");V.done="";V.sess="";
+  if(t)send(t,true);else $("chatIn").value=""}
 $("chatX").onclick=()=>{$("chat").hidden=true;speechSynthesis&&speechSynthesis.cancel()};
 $("muteBtn").onclick=()=>{S.muted=!S.muted;$("muteBtn").textContent=S.muted?"🔇":"🔊";if(S.muted&&window.speechSynthesis)speechSynthesis.cancel()};
 $("chatForm").addEventListener("submit",e=>{e.preventDefault();unlockTTS();const t=$("chatIn").value.trim();if(t)send(t)});
@@ -638,20 +657,23 @@ function execPlan(p){
   const cnt=n===1?KL[0]+" אחת":n+" "+KL[1];
   let text,head;
   if(!n){head=text="לא מצאתי "+KL[1]+(lab?" ("+lab+")":"")+".";}
-  else if(p.metric==="count"){head=cnt+(lab?" – "+lab:"")+".";text=head+(sum?" סה\"כ "+nis(sum)+".":"")+" "+few}
+  else if(p.metric==="count"){head=cnt+(lab?" – "+lab:"")+(n<=3?": "+rows.map(name).join(", "):"")+".";text=head+(sum?" סה\"כ "+nis(sum)+".":"")+" "+few}
   else if(p.metric==="sum"||p.metric==="avg"){const v=p.metric==="avg"?sum/n:sum;head=(p.metric==="avg"?"ממוצע ":"סה\"כ ")+nis(v)+" ב-"+cnt+(lab?" ("+lab+")":"")+".";text=head+(inR?" החישוב לפי "+DATE_F[f]+(f==="order"?" (סכומי ההזמנות שנפתחו, לא תשלומים)":"")+".":"")+" "+(p.metric==="avg"?"":"הגדולות: ")+rows.slice().sort((a,b)=>amt(b)-amt(a)).slice(0,5).map(o=>name(o)+" "+nis(amt(o))).join(", ")}
   else if(p.metric==="group"&&p.groupBy){const G={};const gk=o=>p.groupBy==="month"?(o.date||"").slice(0,7):p.groupBy==="stage"?stageL(o.stage):p.groupBy==="supplier"?(sup(o)||"ללא ספק"):p.groupBy==="color"?(o.color||"ללא צבע"):p.groupBy==="delivery"?(o.delivery||"לא צוין"):(o.customer||"ללא שם");
     rows.forEach(o=>{const k=gk(o);G[k]=G[k]||{n:0,s:0};G[k].n++;G[k].s+=amt(o)});const gs=Object.entries(G).sort((a,b)=>b[1].s-a[1].s||b[1].n-a[1].n);
     head=cnt+(lab?" ("+lab+")":"")+", לפי "+({customer:"לקוח",stage:"שלב",month:"חודש",supplier:"ספק",color:"צבע",delivery:"אספקה"}[p.groupBy]||p.groupBy)+".";
     text=head+" "+gs.slice(0,lim).map(([k,v])=>k+": "+v.n+(v.s?" ("+nis(v.s)+")":"")).join("; ")+(gs.length>lim?" ועוד "+(gs.length-lim):"")}
-  else{head="מצאתי "+cnt+(lab?" ("+lab+")":"")+(sum?" בסך "+nis(sum):"")+".";text=head+" "+few}
+  else{const sh=rows.slice(0,5).map(o=>(o.num?(kind==="quotes"?"הצעה ":kind==="leads"?"פנייה ":"הזמנה ")+o.num:"ללא מספר")+(p.wantNum?"":" "+(o.customer||""))+(amt(o)?", "+nis(amt(o)):"")+(o.date?", מ-"+fmt(o.date):"")).join("; ");
+    if(n<=5||p.wantNum){head="מצאתי "+cnt+(lab?" ("+lab+")":"")+": "+sh+(n>5?" ועוד "+(n-5):"")+".";text=head+(n>1&&sum?" סה\"כ "+nis(sum)+".":"")}   // מעט תוצאות: אומרים את המספרים בקול
+    else{head="מצאתי "+cnt+(lab?" ("+lab+")":"")+(sum?" בסך "+nis(sum):"")+".";text=head+" "+few}}
   return {rows,text,head,label:lab,kind,n,sum,field:f}}
 /* תוכנית מקומית (בלי מודל) מתוך parseQ: מספיקה לרוב השאלות הנפוצות, ועונה מיד */
-const NOISE=/^(?:[ומשבלכה]{0,2})(?:שולם|שילם|כסף|נכנס(?:ו|ה)?|התקבל(?:ו|ה)?|נפתח(?:ו|ה)?|סכום|סה"?כ|מחזור|שווי|תקבול(?:ים)?|גבי(?:ה|נו|תי)|שולמ[הו]?|שילמ[הו]?|קבל(?:ה|ות)|ממוצע|יצא[הו]?|הוצא[הו]?|הופק[הו]?|בסך|מצב|סטטוס|לקוח(?:ות)?|מוצר(?:ים)?|עסק(?:ה|אות)?|פרטים|כולל|מכר(?:נו|תי)?|מכירות|הכנסות|תסביר|תסכם|סכם|למה|מדוע|דעתך|כדאי|לעשות|קרה|אמר|ביקש|בעיה|תראה|תגיד|לפי|הצע(?:ה|ות)|צע(?:ה|ות)|מחיר|פני(?:ה|ות|יה|יות)|ליד(?:ים)?|הזמנ(?:ה|ות)|זמנ(?:ה|ות)|חודש|שבוע|שנה|היום|אתמול)$/;
+const NOISE=/^(?:[ומשבלכה]{0,2})(?:שולם|שילם|כסף|נכנס(?:ו|ה)?|התקבל(?:ו|ה)?|נפתח(?:ו|ה)?|סכום|סה"?כ|מחזור|שווי|תקבול(?:ים)?|גבי(?:ה|נו|תי)|שולמ[הו]?|שילמ[הו]?|קבל(?:ה|ות)|ממוצע|יצא[הו]?|הוצא[הו]?|הופק[הו]?|בסך|מצב|סטטוס|לקוח(?:ות)?|מוצר(?:ים)?|עסק(?:ה|אות)?|פרטים|כולל|מכר(?:נו|תי)?|מכירות|הכנסות|תסביר|תסכם|סכם|למה|מדוע|דעתך|כדאי|לעשות|קרה|אמר|ביקש|בעיה|תראה|תגיד|לפי|הצע(?:ה|ות)|צע(?:ה|ות)|מחיר|פני(?:ה|ות|יה|יות)|ליד(?:ים)?|הזמנ(?:ה|ות)|זמנ(?:ה|ות)|חודש|שבוע|שנה|היום|אתמול|מספר(?:י|ים)?|מס|איזה|אילו|תן|תני|לי|את)$/;
 function localPlan(raw){const q=" "+raw+" ";const pq=parseQ(raw);
   const p={preds:pq.preds.slice(),labels:pq.labels.slice(),kind:/הצע(?:ה|ות)/.test(q)?"quotes":/פני(?:ה|ות|יה|יות)|לידי?ם?|\sליד\s/.test(q)?"leads":"orders",metric:"list"};
   if(/כמה\s+כסף|סכום|סה["”]?כ|מחזור|שווי|בכמה|כמה\s+שילמ|כמה\s+שולם|כמה\s+נכנס|הכנסות|מכירות|מכר(?:נו|תי)/.test(q))p.metric="sum";else if(/כמה\s+(?:הזמנות|הצעות|פניות|לקוחות)|מספר\s+ה/.test(q))p.metric="count";
   if(/ממוצע/.test(q))p.metric="avg";
+  if(/מה\s+(?:זה\s+)?(?:ה)?מספר|מספרי\s+ה|איזה\s+מספר|מה\s+המס['׳]|איזה\s+הזמנ|אילו\s+הזמנ|תן\s+לי\s+(?:את\s+)?(?:ה)?מספר/.test(q)){p.metric="list";p.wantNum=true}  // "מה מספר ההזמנה של X" = מבקש את המספרים, לא ספירה
   if(/לפי\s+לקוח/.test(q)){p.metric="group";p.groupBy="customer"}else if(/לפי\s+חודש/.test(q)){p.metric="group";p.groupBy="month"}else if(/לפי\s+ספק/.test(q)){p.metric="group";p.groupBy="supplier"}
   if(pq.rng){if(pq.dateIdx!=null){p.preds.splice(pq.dateIdx,1);p.labels.splice(pq.dateIdx,1)}
     let f="order";const L=pq.labels;
@@ -668,13 +690,16 @@ function rowTxt(o){const d=docs(o),r=rdocs(o);
 function showResult(res){S.qsel=new Set(res.rows.map(o=>o.id));S.qlabel=res.label||"";S.kpi="";S.qst="all";$("q").value="";
   S.tab=res.kind==="quotes"?"quotes":res.kind==="leads"?"leads":(res.rows.length&&res.rows.every(o=>!OPEN.includes(o.stage))?"hist":"list");render()}
 function clearSel(){if(S.qsel){S.qsel=null;S.qlabel=""}}
-async function send(t){$("chatIn").value="";addMsg("u",t);const t0=Date.now();
-  let p=localPlan(t),res=null,src="מהנתונים בדשבורד";
+const FIX_RX=/(^|\s)(לא רגע|רגע|בעצם|סליחה|כלומר|אממ+|אהה+|אה|תתקן|לא לא|התכוונתי|לא,)(\s|$)/;
+async function send(t,voice){$("chatIn").value="";addMsg("u",t);const t0=Date.now();
+  const messy=voice&&(FIX_RX.test(t)||t.split(/\s+/).length>14);
+  const q=messy?"(השאלה הוכתבה בקול ויש בה היסוסים, מחשבות בקול ותיקונים. התעלם מכל מה שתוקן או בוטל וענה רק על הכוונה הסופית) "+t:t;
+  let p=localPlan(t),res=null,src="מהנתונים בדשבורד";if(messy)p.smart=false;
   const useAI=!!(S.ai&&(S.ai.gemini||S.ai.claude)),secs=()=>" · "+((Date.now()-t0)/1000).toFixed(1)+" שנ'";
   try{res=execPlan(p)}catch(e){res=null}
   const weak=!res||!res.n||(!p.preds.length&&!p.date&&p.metric==="list"&&!p.needsAI&&res.n>40);
   if(useAI&&(!p.smart||weak)){const w=addMsg("a","מבין את השאלה…");
-    try{const r=await run("plan",S.pw,t,S.hist,$("prov").value);const ap=r.plan||{};
+    try{const r=await run("plan",S.pw,q,S.hist,$("prov").value);const ap=r.plan||{};
       if(ap.kind||ap.stages||(ap.text&&ap.text.length)||ap.date||ap.docs||ap.metric){const np=Object.assign({},ap,{preds:[],labels:[],text:ap.text||[],needsAI:!!ap.needsAI||p.needsAI});const r2=execPlan(np);if(r2.n||!res||!res.n){p=np;res=r2}}
       else if(ap.needsAI)p.needsAI=true;
       src=(r.provider==="gemini"?"ג'מיני":"Claude")+" + הנתונים"}
@@ -685,7 +710,7 @@ async function send(t){$("chatIn").value="";addMsg("u",t);const t0=Date.now();
   const w=addMsg("a","חושב…");
   const base=res&&res.n?res.rows:null;
   const facts=base?(res.head+"\n"+base.slice(0,25).map(rowTxt).join("\n")):"";
-  try{const r=await run("ask",S.pw,t,S.hist,$("prov").value,facts);w.replaceWith(addMsg("a",r.answer,(r.provider==="gemini"?"ג'מיני":"Claude")+(base?" · לפי "+Math.min(base.length,25)+" מתוך "+base.length+" רשומות":" · לפי כל הנתונים")+secs()));S.hist=S.hist.concat([{role:"user",content:t},{role:"assistant",content:r.answer}]).slice(-6);S.lastAns=r.answer;speak(r.answer);if(base)showResult(res)}
+  try{const r=await run("ask",S.pw,q,S.hist,$("prov").value,facts);w.replaceWith(addMsg("a",r.answer,(r.provider==="gemini"?"ג'מיני":"Claude")+(base?" · לפי "+Math.min(base.length,25)+" מתוך "+base.length+" רשומות":" · לפי כל הנתונים")+secs()));S.hist=S.hist.concat([{role:"user",content:t},{role:"assistant",content:r.answer}]).slice(-6);S.lastAns=r.answer;speak(r.answer);if(base)showResult(res)}
   catch(e){w.textContent=e.message}}
 function speak(t){if(S.muted||!window.speechSynthesis)return;try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang="he-IL";const v=speechSynthesis.getVoices().find(x=>/he|iw/i.test(x.lang));if(v)u.voice=v;speechSynthesis.speak(u)}catch(e){}}
 </script>
