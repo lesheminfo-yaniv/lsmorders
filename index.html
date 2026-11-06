@@ -619,7 +619,10 @@ function amountOf(o,f,inR){if(f==="dn")return rdocs(o).dn.filter(x=>inR(x.date))
   if(f==="receipt")return rdocs(o).inv.filter(x=>x.rec.some(inR)).reduce((a,x)=>a+x.amt,0);
   return money(o)}
 const norm=w=>String(w||"").trim().replace(/^(?:עיריית|עירית|עיריה|מועצה\s+(?:מקומית|אזורית)|מ\.מ\.?|מ\.א\.?|חברת|קיבוץ|מושב)\s+/,"").replace(/["'״׳]/g,"");
-function hitLoose(o,w){w=norm(w);if(!w)return true;if(textHit(o,w))return true;const ws=w.split(/\s+/).filter(x=>x.length>2);return ws.length>0&&ws.every(x=>textHit(o,x)||textHit(o,x.replace(/^[והבלמשכ]/,"")))}
+const FIN=t=>String(t).replace(/ך/g,"כ").replace(/ם/g,"מ").replace(/ן/g,"נ").replace(/ף/g,"פ").replace(/ץ/g,"צ");
+function stem(x){const v=[x,x.replace(/^[והבלמשכ]/,"")];v.slice().forEach(y=>{const z=y.replace(/(?:ים|ות|יות|ה)$/,"");if(z.length>2&&!v.includes(z))v.push(z)});return v.map(FIN)}   // "לאשפתונים" → "אשפתונ" → מתאים ל"אשפתון"
+function hitLoose(o,w){w=norm(w);if(!w)return true;if(textHit(o,w))return true;const ws=w.split(/\s+/).filter(x=>x.length>2);return ws.length>0&&ws.every(x=>stem(x).some(y=>textHitF(o,y)))}
+function textHitF(o,w){o.__t=o.__t&&o.__tl===(o.links||[]).length?o.__t:(o.__tl=(o.links||[]).length,o.__t=FIN([o.num,o.customer,o.rivhitCustomer,o.model,o.desc,o.color,o.contact,o.phone,o.address,o.custPO,o.invoice,sup(o),(o.rivhitLines||[]).join(" "),(o.links||[]).filter(l=>l.type==="supplier"&&!l.hidden).map(l=>l.title).join(" ")].join(" ")));return o.__t.includes(w)}
 const nis=n=>Math.round(n).toLocaleString("he-IL")+" ₪";
 const KIND_L={orders:["הזמנה","הזמנות"],quotes:["הצעת מחיר","הצעות מחיר"],leads:["פנייה","פניות"]};
 function execPlan(p){
@@ -659,6 +662,19 @@ function execPlan(p){
   if(!n){head=text="לא מצאתי "+KL[1]+(lab?" ("+lab+")":"")+".";}
   else if(p.metric==="count"){head=cnt+(lab?" – "+lab:"")+(n<=3?": "+rows.map(name).join(", "):"")+".";text=head+(sum?" סה\"כ "+nis(sum)+".":"")+" "+few}
   else if(p.metric==="sum"||p.metric==="avg"){const v=p.metric==="avg"?sum/n:sum;head=(p.metric==="avg"?"ממוצע ":"סה\"כ ")+nis(v)+" ב-"+cnt+(lab?" ("+lab+")":"")+".";text=head+(inR?" החישוב לפי "+DATE_F[f]+(f==="order"?" (סכומי ההזמנות שנפתחו, לא תשלומים)":"")+".":"")+" "+(p.metric==="avg"?"":"הגדולות: ")+rows.slice().sort((a,b)=>amt(b)-amt(a)).slice(0,5).map(o=>name(o)+" "+nis(amt(o))).join(", ")}
+  else if(p.metric==="colors"||p.metric==="paint"){const rs=p.metric==="paint"?rows.filter(o=>supLinks(o).some(x=>x.paint)):rows.filter(o=>colorsOf(o).length);const nc=rows.length-rs.length;
+    const C={};rs.forEach(o=>colorsOf(o).forEach(c=>{C[c]=C[c]||{n:0,last:""};C[c].n++;if((o.date||"")>C[c].last)C[c].last=o.date||""}));const cs=Object.entries(C).sort((a,b)=>b[1].n-a[1].n||b[1].last.localeCompare(a[1].last));
+    if(!rs.length){head=text="לא מצאתי ציון צבע ב-"+cnt+(lab?" ("+lab+")":"")+". אפשר לבדוק במיילים או בהצעת המחיר.";rows=[]}
+    else{const usual=cs.length>1&&cs[0][1].n>=2?"בדרך כלל "+cs[0][0]+" ("+cs[0][1].n+" מתוך "+rs.length+")":"";
+      const det=rs.slice(0,lim).map(o=>{const P=supLinks(o).filter(x=>x.paint);return "הזמנה "+(o.num||"")+(o.date?" מ-"+fmt(o.date):"")+": "+colorsOf(o).join(" / ")+(o.model?" – "+String(o.model).slice(0,50):"")+(p.metric==="paint"&&P.length?" (למצבעה "+P.map(x=>fmt(x.date)+(x.what?": "+x.what.slice(0,80):"")).join("; ")+")":"")}).join("; ");
+      head=(usual?usual+". ":"")+"צבעים ב-"+rs.length+" "+KL[1]+(lab?" ("+lab+")":"")+": "+cs.slice(0,4).map(([k,v])=>k+" ("+v.n+")").join(", ")+". האחרונה: "+det.split("; ")[0]+".";
+      text=(usual?usual+". ":"")+"צבעים ב-"+rs.length+" "+KL[1]+(lab?" ("+lab+")":"")+(nc?" (ב-"+nc+" אין ציון צבע)":"")+": "+cs.map(([k,v])=>k+" ("+v.n+")").join(", ")+". לפי הזמנה: "+det+(rs.length>lim?" ועוד "+(rs.length-lim):"")+". המקור: הזמנות למצבעה ושורות רווחית.";rows=rs}}
+  else if(p.metric==="suppliers"){const rs=rows.filter(o=>suppliersOf(o).length);const nc=rows.length-rs.length;
+    if(!rs.length){head=text="לא מצאתי הזמנות ספק מקושרות ל-"+cnt+(lab?" ("+lab+")":"")+".";rows=[]}
+    else{const G={};rs.forEach(o=>suppliersOf(o).forEach(x=>{G[x.name]=G[x.name]||{n:0,last:""};G[x.name].n++;if(x.date>G[x.name].last)G[x.name].last=x.date}));const gs=Object.entries(G).sort((a,b)=>b[1].n-a[1].n);
+      const det=rs.slice(0,lim).map(o=>"הזמנה "+(o.num||"")+(o.date?" מ-"+fmt(o.date):"")+" ("+(o.customer||"")+"): "+suppliersOf(o).map(x=>x.name+(x.paint?" (מצבעה)":"")+(x.date?" "+fmt(x.date):"")+(x.what?" – "+x.what.slice(0,70):"")).join("; ")).join(" || ");
+      head=(rs.length===1?"":"ספקים ב-"+rs.length+" "+KL[1]+(lab?" ("+lab+")":"")+": "+gs.slice(0,4).map(([k,v])=>k+" ("+v.n+")").join(", ")+". ")+det.split(" || ")[0]+".";
+      text="ספקים ב-"+rs.length+" "+KL[1]+(lab?" ("+lab+")":"")+(nc?" (ב-"+nc+" אין הזמנת ספק מקושרת)":"")+": "+gs.map(([k,v])=>k+" ("+v.n+")").join(", ")+". לפי הזמנה: "+det+(rs.length>lim?" ועוד "+(rs.length-lim):"")+".";rows=rs}}
   else if(p.metric==="group"&&p.groupBy){const G={};const gk=o=>p.groupBy==="month"?(o.date||"").slice(0,7):p.groupBy==="stage"?stageL(o.stage):p.groupBy==="supplier"?(sup(o)||"ללא ספק"):p.groupBy==="color"?(o.color||"ללא צבע"):p.groupBy==="delivery"?(o.delivery||"לא צוין"):(o.customer||"ללא שם");
     rows.forEach(o=>{const k=gk(o);G[k]=G[k]||{n:0,s:0};G[k].n++;G[k].s+=amt(o)});const gs=Object.entries(G).sort((a,b)=>b[1].s-a[1].s||b[1].n-a[1].n);
     head=cnt+(lab?" ("+lab+")":"")+", לפי "+({customer:"לקוח",stage:"שלב",month:"חודש",supplier:"ספק",color:"צבע",delivery:"אספקה"}[p.groupBy]||p.groupBy)+".";
@@ -668,11 +684,13 @@ function execPlan(p){
     else{head="מצאתי "+cnt+(lab?" ("+lab+")":"")+(sum?" בסך "+nis(sum):"")+".";text=head+" "+few}}
   return {rows,text,head,label:lab,kind,n,sum,field:f}}
 /* תוכנית מקומית (בלי מודל) מתוך parseQ: מספיקה לרוב השאלות הנפוצות, ועונה מיד */
-const NOISE=/^(?:[ומשבלכה]{0,2})(?:שולם|שילם|כסף|נכנס(?:ו|ה)?|התקבל(?:ו|ה)?|נפתח(?:ו|ה)?|סכום|סה"?כ|מחזור|שווי|תקבול(?:ים)?|גבי(?:ה|נו|תי)|שולמ[הו]?|שילמ[הו]?|קבל(?:ה|ות)|ממוצע|יצא[הו]?|הוצא[הו]?|הופק[הו]?|בסך|מצב|סטטוס|לקוח(?:ות)?|מוצר(?:ים)?|עסק(?:ה|אות)?|פרטים|כולל|מכר(?:נו|תי)?|מכירות|הכנסות|תסביר|תסכם|סכם|למה|מדוע|דעתך|כדאי|לעשות|קרה|אמר|ביקש|בעיה|תראה|תגיד|לפי|הצע(?:ה|ות)|צע(?:ה|ות)|מחיר|פני(?:ה|ות|יה|יות)|ליד(?:ים)?|הזמנ(?:ה|ות)|זמנ(?:ה|ות)|חודש|שבוע|שנה|היום|אתמול|מספר(?:י|ים)?|מס|איזה|אילו|תן|תני|לי|את)$/;
+const NOISE=/^(?:[ומשבלכה]{0,2})(?:שולם|שילם|כסף|נכנס(?:ו|ה)?|התקבל(?:ו|ה)?|נפתח(?:ו|ה)?|סכום|סה"?כ|מחזור|שווי|תקבול(?:ים)?|גבי(?:ה|נו|תי)|שולמ[הו]?|שילמ[הו]?|קבל(?:ה|ות)|ממוצע|יצא[הו]?|הוצא[הו]?|הופק[הו]?|בסך|מצב|סטטוס|לקוח(?:ות)?|מוצר(?:ים)?|עסק(?:ה|אות)?|פרטים|כולל|מכר(?:נו|תי)?|מכירות|הכנסות|תסביר|תסכם|סכם|למה|מדוע|דעתך|כדאי|לעשות|קרה|אמר|ביקש|בעיה|תראה|תגיד|לפי|הצע(?:ה|ות)|צע(?:ה|ות)|מחיר|פני(?:ה|ות|יה|יות)|ליד(?:ים)?|הזמנ(?:ה|ות)|זמנ(?:ה|ות)|חודש|שבוע|שנה|היום|אתמול|מספר(?:י|ים)?|מס|איזה|אילו|תן|תני|לי|את|צבע(?:ים)?|הצבע(?:ים)?|גוון|בצבע|ראל|שלחנו|למצבעה|מצבעה|הזמין|הזמינו|הזמינה|רוצה|רצה|רוצים|צבענו|לצבוע|נצבע|חומר|גלם|ספק(?:ים)?|הספק(?:ים)?|מאיפה|מאיזה|ממי|סיפק|קנינו|בדרך|כלל|קבוע|רגיל|עבור|בשביל|שלהם|שלה|שלו|מה|היסטוריה|בעבר|פעם|קודמת|קודם|אחרונה|האחרונה|אחרון|האחרון|שלח|נשלח|ביותר|הכי|זמי[נן](?:ה|ו)?|זמנתי|זמנו|זמנת|מזמי[נן](?:ה|ים)?|תמיד|הזמי[נן](?:ה|ו)?)$/;
 function localPlan(raw){const q=" "+raw+" ";const pq=parseQ(raw);
   const p={preds:pq.preds.slice(),labels:pq.labels.slice(),kind:/הצע(?:ה|ות)/.test(q)?"quotes":/פני(?:ה|ות|יה|יות)|לידי?ם?|\sליד\s/.test(q)?"leads":"orders",metric:"list"};
   if(/כמה\s+כסף|סכום|סה["”]?כ|מחזור|שווי|בכמה|כמה\s+שילמ|כמה\s+שולם|כמה\s+נכנס|הכנסות|מכירות|מכר(?:נו|תי)/.test(q))p.metric="sum";else if(/כמה\s+(?:הזמנות|הצעות|פניות|לקוחות)|מספר\s+ה/.test(q))p.metric="count";
   if(/ממוצע/.test(q))p.metric="avg";
+  if(/איזה\s+צבע|באיזה\s+צבע|מה\s+הצבע|צבע(?:ים)?\s+(?:של|הזמין|הזמינו|הזמנ|רגיל|בדרך|קבוע)|(?:הזמין|הזמינו|רוצה|רצה|צבענו|נצבע|לצבוע)\s+(?:ב)?צבע|גוון|ראל\b|RAL|מה\s+שלחנו\s+למצבעה|למצבעה|מצבעה/i.test(q)&&!/^\s*(?:מה|הזמנות|כמה)\s+בצבע\s*$/.test(q)){p.metric=/מצבעה/.test(q)?"paint":"colors"}
+  else if(/מאיפה\s+הזמנ|מאיזה\s+ספק|מי\s+הספק|ספק(?:ים)?\s+של|איזה\s+ספק|חומר\s+גלם|מי\s+סיפק|ממי\s+הזמנ|ממי\s+קנינו|הזמנות\s+(?:מ)?ספק/.test(q))p.metric="suppliers";
   if(/מה\s+(?:זה\s+)?(?:ה)?מספר|מספרי\s+ה|איזה\s+מספר|מה\s+המס['׳]|איזה\s+הזמנ|אילו\s+הזמנ|תן\s+לי\s+(?:את\s+)?(?:ה)?מספר/.test(q)){p.metric="list";p.wantNum=true}  // "מה מספר ההזמנה של X" = מבקש את המספרים, לא ספירה
   if(/לפי\s+לקוח/.test(q)){p.metric="group";p.groupBy="customer"}else if(/לפי\s+חודש/.test(q)){p.metric="group";p.groupBy="month"}else if(/לפי\s+ספק/.test(q)){p.metric="group";p.groupBy="supplier"}
   if(pq.rng){if(pq.dateIdx!=null){p.preds.splice(pq.dateIdx,1);p.labels.splice(pq.dateIdx,1)}
@@ -682,8 +700,15 @@ function localPlan(raw){const q=" "+raw+" ";const pq=parseQ(raw);
   p.text=pq.rest.filter(w=>!NOISE.test(w));p.smart=pq.smart||p.metric!=="list"||(p.text.length>0&&!!p.kind);
   p.needsAI=/למה|מדוע|מה\s+(?:קרה|אמר|ביקש|הבעיה|המצב)|מה\s+לעשות|תסביר|סכם|תסכם|האם\s+כדאי|מה\s+דעתך|איך|מתי\s+(?:הבטחנו|צריך)/.test(q);
   return p}
+/* צבעים וספקים של הזמנה: מהשדה "צבע", מהזמנות הספק המקושרות (מצבעה) ומשורות רווחית */
+const COLOR_RX=/(?:RAL|ראל)\s*[-:]?\s*(\d{3,4})|(?<![\d/.])(096)(?![\d/.])|(?:צבע|גוון|בגוון)\s+(\d{4})(?![\d/.])|(?:צבע|גוון|בגוון|נצבע|צבוע|צבועה|לצבוע)\s+(?:בתנור\s+|קלוי\s+)?(?:בגוון\s+)?(שחור(?:\s*מט)?|לבן|אפור(?:\s*(?:כהה|בהיר))?|ירוק(?:\s*(?:כהה|בהיר))?|כחול(?:\s*(?:כהה|בהיר))?|אדום|צהוב|כתום|חום|שמנת|אגוז|בז'?|כסוף|זהב|אנתרציט|גרפיט|טורקיז|קורטן)/g;
+function colorsIn(t){const out=[];let m;COLOR_RX.lastIndex=0;while((m=COLOR_RX.exec(String(t||"")))){const c=m[1]?(m[1]==="096"?"אפור 096":"RAL "+m[1]):m[2]?"אפור 096":m[3]?"RAL "+m[3]:m[4].trim();if(!out.includes(c))out.push(c)}return out}
+function supLinks(o){return (o.links||[]).filter(l=>l.type==="supplier"&&!l.hidden).map(l=>{const m=String(l.title||"").match(/הזמנה מספק\s*(\d+)\s*·\s*(.+?)\s*(?:\(מצבעה\))?$/);return {num:m?m[1]:"",name:m?m[2].trim():String(l.title||""),paint:/מצבעה|פלג ניא/.test(l.title||""),date:l.date||"",what:String(l.snippet||"").replace(/\s*\(זוהה לפי.*$/,"").replace(/^צבע:[^.]*\.\s*/,"")}})}
+function colorsOf(o){if(o.color)return String(o.color).replace(/\s*\([^)]*\)\s*$/,"").split(/\s*\/\s*/).filter(Boolean);const P=supLinks(o).filter(x=>x.paint);let c=colorsIn(P.map(x=>x.what).join(" ; "));if(!c.length)c=colorsIn((o.rivhitLines||[]).join(" ; ")+" ; "+(o.desc||"")+" ; "+(o.model||""));return c}
+function colorSrc(o){const m=String(o.color||"").match(/\(([^)]*)\)\s*$/);return m?m[1]:(supLinks(o).some(x=>x.paint)?"מצבעה":"רווחית")}
+function suppliersOf(o){const L=supLinks(o).map(x=>({name:x.name,date:x.date,what:x.what,num:x.num,paint:x.paint}));(o.suppliers||[]).forEach(s=>{if(s.name&&!L.some(x=>x.name===s.name))L.push({name:s.name,date:"",what:[s.role,s.item,s.status].filter(Boolean).join(" "),num:"",paint:false})});return L}
 function rowTxt(o){const d=docs(o),r=rdocs(o);
-  return [(isQ(o)?"הצעה ":isL(o)?"פנייה ":"הזמנה ")+(o.num||""),"לקוח: "+(o.customer||""),"תאריך: "+(o.date||""),"שלב: "+stageL(o.stage),"מוצר: "+[o.qty,o.model,o.desc].filter(Boolean).join(" "),o.color&&"צבע: "+o.color,o.delivery&&"אספקה: "+o.delivery,o.address&&"כתובת: "+o.address,(o.contact||o.phone)&&"איש קשר: "+[o.contact,o.phone].filter(Boolean).join(" "),o.orderTotal&&"סכום: "+o.orderTotal,o.custPO&&"הזמנת לקוח: "+o.custPO,o.closedDate&&"סופק/נסגר: "+o.closedDate,o.promised&&"הובטח: "+o.promised,
+  return [(isQ(o)?"הצעה ":isL(o)?"פנייה ":"הזמנה ")+(o.num||""),"לקוח: "+(o.customer||""),"תאריך: "+(o.date||""),"שלב: "+stageL(o.stage),"מוצר: "+[o.qty,o.model,o.desc].filter(Boolean).join(" "),colorsOf(o).length&&"צבע: "+colorsOf(o).join(" / ")+" (מקור: "+colorSrc(o)+")",suppliersOf(o).length&&"הזמנות מספקים: "+suppliersOf(o).map(x=>x.name+(x.paint?" (מצבעה)":"")+(x.date?" "+fmt(x.date):"")+(x.what?": "+x.what.slice(0,90):"")).join(" | "),o.delivery&&"אספקה: "+o.delivery,o.address&&"כתובת: "+o.address,(o.contact||o.phone)&&"איש קשר: "+[o.contact,o.phone].filter(Boolean).join(" "),o.orderTotal&&"סכום: "+o.orderTotal,o.custPO&&"הזמנת לקוח: "+o.custPO,o.closedDate&&"סופק/נסגר: "+o.closedDate,o.promised&&"הובטח: "+o.promised,
     sup(o)&&"ספקים: "+(o.suppliers||[]).map(s=>[s.name,s.role,s.item,s.status].filter(Boolean).join(" ")).join(", "),(o.flags||[]).length&&"לבדוק: "+o.flags.join("; "),(o.rivhitLines||[]).length&&"שורות: "+o.rivhitLines.slice(0,6).join("; "),
     "תעודות משלוח: "+(r.dn.length?r.dn.map(x=>x.date+" "+nis(x.amt)).join(", "):"אין"),"חשבוניות: "+(r.inv.length?r.inv.map(x=>x.date+" "+nis(x.amt)+(x.paid?" שולמה "+x.rec.join(","):" לא שולמה")).join(", "):"אין"),
     o.prodNotes&&"הערות: "+String(o.prodNotes).slice(0,300),(o.links||[]).filter(l=>!l.hidden&&l.type!=="rivhit").slice(-5).map(l=>(l.date||"")+" "+(l.title||"")+(l.snippet?": "+String(l.snippet).slice(0,160):"")).join(" | "),(o.log||[]).slice(-3).map(l=>(l.t||"").slice(0,10)+" "+(l.by?l.by+": ":"")+l.text).join(" | ")].filter(Boolean).join(" · ")}
@@ -700,7 +725,7 @@ async function send(t,voice){$("chatIn").value="";addMsg("u",t);const t0=Date.no
   const weak=!res||!res.n||(!p.preds.length&&!p.date&&p.metric==="list"&&!p.needsAI&&res.n>40);
   if(useAI&&(!p.smart||weak)){const w=addMsg("a","מבין את השאלה…");
     try{const r=await run("plan",S.pw,q,S.hist,$("prov").value);const ap=r.plan||{};
-      if(ap.kind||ap.stages||(ap.text&&ap.text.length)||ap.date||ap.docs||ap.metric){const np=Object.assign({},ap,{preds:[],labels:[],text:ap.text||[],needsAI:!!ap.needsAI||p.needsAI});const r2=execPlan(np);if(r2.n||!res||!res.n){p=np;res=r2}}
+      if(ap.kind||ap.stages||(ap.text&&ap.text.length)||ap.date||ap.docs||ap.metric){const np=Object.assign({},ap,{preds:[],labels:[],text:(ap.text||[]).filter(w=>!NOISE.test(norm(w))),needsAI:!!ap.needsAI||p.needsAI});if(["colors","paint","suppliers"].includes(p.metric)&&(!ap.metric||ap.metric==="list"||ap.metric==="count"))np.metric=p.metric;const r2=execPlan(np);if(r2.n||!res||!res.n){p=np;res=r2}}
       else if(ap.needsAI)p.needsAI=true;
       src=(r.provider==="gemini"?"ג'מיני":"Claude")+" + הנתונים"}
     catch(e){src="מהנתונים בדשבורד (המודל לא זמין: "+e.message+")"}
