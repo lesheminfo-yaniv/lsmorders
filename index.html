@@ -472,7 +472,7 @@ function filt(list){const q=$("q").value.trim(),sp=$("fSupplier").value,dv=$("fD
 
 /* ---- תצוגה ---- */
 function selBar(n,sum){if(!S.qsel)return null;return el("div",{class:"smartbar"},el("b",{},"תוצאת השאלה: "+n),S.qlabel?el("span",{class:"tag"},S.qlabel):null,sum?el("span",{class:"note"},"סה\"כ "+nis(sum)):null,el("button",{class:"btn",type:"button",onclick:()=>{clearSel();render()}},"✕ נקה"))}
-function render(){render0();if(S.sheet)drawSheet()}
+function render(){const y=window.scrollY,same=S._rt===S.tab;S._rt=S.tab;render0();if(S.sheet)drawSheet();if(same&&Math.abs(window.scrollY-y)>2)window.scrollTo(0,y)}
 function render0(){
   const open=S.orders.filter(o=>OPEN.includes(o.stage)),closed=S.orders.filter(o=>!OPEN.includes(o.stage));
   const fs=$("fSupplier"),cur=fs.value;fs.replaceChildren(el("option",{value:""},"כל הספקים"),...[...new Set(S.orders.flatMap(o=>(o.suppliers||[]).map(s=>s.name)))].sort().map(n=>el("option",{value:n},n)));fs.value=cur;
@@ -503,8 +503,8 @@ function tagsFor(o,withStage){const m=missing(o),late=isLate(o);return el("div",
 function cls(o){return (!OPEN.includes(o.stage)?" hist":(o.flags||[]).length?" flag":isLate(o)?" late":missing(o).length?" miss":"")}
 function card(o){return el("button",{class:"card"+cls(o),type:"button",onclick:()=>openSheet(o.id)},el("div",{class:"r1"},el("span",{class:"cust"},o.customer||"ללא שם"),el("span",{class:"num"},o.num||"")),el("div",{class:"what"},[o.qty,o.model,o.desc].filter(Boolean).join(" · ")),tagsFor(o,false))}
 function row(o){const isOpen=S.open===o.id;
-  return el("div",{class:"orow"+cls(o),"open-row":isOpen},
-    el("button",{class:"ohead",type:"button","aria-expanded":isOpen?"true":"false",onclick:()=>{S.open=isOpen?null:o.id;render()}},
+  return el("div",{class:"orow"+cls(o),"open-row":isOpen,"data-id":o.id},
+    el("button",{class:"ohead",type:"button","aria-expanded":isOpen?"true":"false",onclick:e=>{const b=e.currentTarget,t0=b.getBoundingClientRect().top;S.open=isOpen?null:o.id;render();const nb=[...document.querySelectorAll(".ohead")].find(x=>x.closest(".orow")&&x.closest(".orow").dataset.id===o.id);if(nb)window.scrollBy(0,nb.getBoundingClientRect().top-t0)}},
       el("span",{class:"car"},"◂"),
       el("span",{class:"t1"},el("span",{class:"num"},o.num||"—"),el("span",{class:"cust"},o.customer||""),el("span",{class:"note"},fmt(o.date))),
       el("span",{class:"stg s-"+o.stage},stageL(o.stage)),
