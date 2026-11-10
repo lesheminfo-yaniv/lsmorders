@@ -3,6 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<title>הזמנות ל.ש.מ</title>
+<!-- v20 · 10.11.2026 -->
+
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700&family=Assistant:wght@400;600;700&family=IBM+Plex+Mono:wght@500&display=swap">
 <style>
 /* מעקב רצפת ייצור: פס כותרת, מוני מצב, עץ הזמנות או לוח שלבים, כרטיס הזמנה בצד, עוזר קולי צף */
@@ -131,7 +134,15 @@ a{color:var(--steel2)}
 .scrim{position:fixed;inset:0;background:rgba(10,15,20,.45);z-index:20}
 .sheet{position:fixed;top:0;bottom:0;left:0;width:min(580px,100%);background:var(--panel);z-index:21;overflow-y:auto;padding:16px 18px 40px;box-shadow:0 0 40px rgba(0,0,0,.25);display:grid;gap:16px;align-content:start}
 .sheet .hd{display:flex;justify-content:space-between;gap:10px}
-.stepper{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.stepper{display:grid;grid-template-columns:repeat(8,1fr);gap:3px}
+@media (max-width:600px){.stepper{grid-template-columns:repeat(4,1fr)}}
+/* שורת פעולות אחידה */
+.actwrap{display:grid;gap:6px}
+.acts{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.acts .btn{padding:6px 12px}
+.stsel{padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--panel);max-width:170px}
+.cardhead{border:0;background:transparent;padding:0;text-align:right;display:grid;gap:4px;width:100%;cursor:pointer;color:inherit}
+.help .box{background:color-mix(in srgb,var(--steel2) 10%,var(--panel));border-color:color-mix(in srgb,var(--steel2) 35%,transparent);margin:0 0 10px}
 .stepper button{border:1px solid var(--line);background:var(--bg);border-radius:5px;padding:7px 2px;font-size:11.5px;line-height:1.2;color:var(--muted)}
 .stepper button.done{background:color-mix(in srgb,var(--steel2) 18%,var(--panel));color:var(--ink)}
 .stepper button.cur{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
@@ -201,12 +212,15 @@ textarea{min-height:60px}
       <button role="tab" id="tabHist" aria-selected="false">היסטוריה</button>
     </div>
     <div class="sp"></div>
+    <button class="ghost" id="btnUndo" type="button" hidden>↶ בטל</button>
+    <button class="ghost" id="btnHelp" type="button" aria-label="הסבר על המסך">?</button>
     <span class="who" id="whoLbl"></span>
     <button class="ghost" id="btnSettings" type="button">הגדרות</button>
     <button class="ghost" id="btnOut" type="button">יציאה</button>
   </div></header>
   <main class="wrap">
     <section class="today" id="today" aria-label="היום"></section>
+    <section class="help" id="help" hidden></section>
     <section class="kpis" id="kpis"></section>
     <section class="filters">
       <input id="q" type="search" placeholder="חיפוש או שאלה: לקוח, מספר… או 'תעודת משלוח בלי חשבונית', 'לא שולמו', 'בייצור באיחור'">
@@ -239,7 +253,10 @@ const RAL={"1013":"#e3d9c6","1016":"#f1dd38","1018":"#faca30","1023":"#f9a800","
 const TYPES=[{k:"rivhit",l:"רווחית: הזמנה, תעודות משלוח, חשבוניות",c:"#2f4a66"},{k:"email",l:"מיילים",c:"#c0392b"},{k:"whatsapp",l:"וואטסאפ",c:"#1f9d55"},{k:"call",l:"שיחות טלפון",c:"#8e44ad"},{k:"supplier",l:"ספקים וחומר גלם",c:"#e0a100"},{k:"ret",l:"חזר מהצבע – לעבודה לפני אספקה",c:"#16a085"},{k:"file",l:"קבצים, שרטוטים והצעות מחיר",c:"#7f8c8d"}];
 const el=(t,a={},...c)=>{const e=document.createElement(t);for(const[k,v]of Object.entries(a)){if(k==="class")e.className=v;else if(k.startsWith("on"))e.addEventListener(k.slice(2),v);else if(v!=null&&v!==false)e.setAttribute(k,v===true?"":v)}for(const x of c.flat()){if(x==null||x===false)continue;e.append(x.nodeType?x:document.createTextNode(String(x)))}return e};
 const $=id=>document.getElementById(id);
-const S={orders:[],quotes:[],leads:[],sups:[],sinv:[],tab:"list",kpi:"",pw:"",who:"",open:null,sheet:null,ai:{},muted:false,hist:[]};
+const VER="v20";
+const S={orders:[],quotes:[],leads:[],sups:[],sinv:[],tab:"list",kpi:"",pw:"",who:"",open:null,sheet:null,ai:{},muted:false,hist:[],undo:[]};
+/* replaceChildren(null) מציג את הטקסט "null": כל הרינדור עובר דרך put() שמסנן ריקים */
+const put=(v,...c)=>v.replaceChildren(...c.flat(Infinity).filter(x=>x!=null&&x!==false));
 const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
 const API="https://script.google.com/macros/s/AKfycbwbvfR_0w_VCmqap5lHR8jzguIIwoT4zrXtU9zQUtR15kj4TnSOQ2SpsyDOoQ1jt-4/exec";
 const IN_GOOGLE=!!(window.google&&google.script&&google.script.run);
@@ -257,13 +274,28 @@ $("gateForm").addEventListener("submit",async e=>{e.preventDefault();
   $("gateBtn").disabled=false});
 (function(){const pw=store.get("lsm_pw"),who=store.get("lsm_who");if(who)$("whoIn").value=who;if(pw&&who){S.pw=pw;S.who=who;run("login",pw).then(r=>{S.ai=r.ai||{};enter()}).catch(()=>{})}})();
 $("btnOut").onclick=()=>{store.del("lsm_pw");location.reload()};
+$("btnUndo").onclick=undo;
+/* ---- עזרה קצרה לכל לשונית (כפתור ?) ---- */
+const HELP={leads:["פניות חדשות מכל הערוצים (אתר, מייל, וואטסאפ, שיחות). הוותיקות למעלה.","לכל פנייה: 'השב' פותח וואטסאפ/מייל עם טיוטה מוכנה; 'דיברתי' שומר עדכון ותזכורת; 'נשלחה הצעה' מעביר למעקב הצעות; 'טופל' / 'לא רלוונטי' סוגרים.","'כרטיס ומסמכים' פותח את כל ההיסטוריה של הפנייה."],
+  list:["כל ההזמנות הפתוחות, החדשות למעלה. לחיצה על שורה פותחת את עץ המסמכים (רווחית, מיילים, וואטסאפ, שיחות, ספקים).","שורת הפעולות בכל הזמנה: ← השלב הבא, בחירת שלב, הובלה/התקנה, סגירה. הכול נשמר מיד ואפשר לבטל ב-↶.","המונים למעלה מסננים: בייצור, בצבע, חסרים פרטים, לבדוק מול רווחית, חורגות."],
+  deliv:["מה חזר מהצבע ומה צריך לעשות לפני אספקה (פח פנימי, דלת, פלטות). סמן ✓ כשבוצע.","מוכן לאספקה – לפי אזור: דרום, מרכז, צפון, ירושלים. האזור נקבע מהכתובת ואפשר לתקן בכפתור 'הובלה'.","מכאן מעבירים ישירות: מוכן → סופק → סגור, ורושמים מי מוביל ומי מתקין."],
+  decide:["הזמנות שנשארו פתוחות וצריך להחליט: נראה שסופקו ושולמו, עם נקודות פתוחות, או בלי עדכון 45 יום.","אפשרויות: סופק, סגור, סגור עם שארית (מה נשאר נרשם ולא נעלם), בוטלה, או לדחות ב-30 יום."],
+  board:["לוח ייצור לפי שלב. בכל כרטיס: ← מעביר לשלב הבא; לחיצה על השם פותחת את הכרטיס המלא."],
+  quotes:["הצעות מחיר פתוחות מרווחית לפי גיל: מתקררות (10+ ימים), לבדוק (5–9), חדשות.","'השב במייל ההצעה' מעתיק תזכורת מעוצבת ופותח את המייל המקורי. 'התקבלה הזמנה' / 'לא רלוונטית' סוגרים."],
+  sup:["הזמנות ספק מרווחית (סוג 13), חשבוניות ספק שנקראו מהמייל, וחריגות מחיר מול היסטוריה.","הקלד למעלה מספר הזמנה שלנו, שם ספק או מה הוזמן."],
+  hist:["הזמנות שסופקו או נסגרו (שנתיים). סופק = תעודת משלוח מלאה ברווחית. סגור = סופק ושולם."]};
+$("btnHelp").onclick=()=>{S.help=!S.help;render()};
+function helpBox(){const h=$("help");h.hidden=!S.help;if(!S.help)return;const L=HELP[S.tab]||[];
+  put(h,el("div",{class:"box",style:"display:grid;gap:4px"},el("div",{style:"display:flex;gap:8px;align-items:baseline"},el("b",{},"מה עושים כאן"),el("span",{class:"sp"}),el("button",{class:"lnk",type:"button",onclick:()=>{S.help=false;render()}},"סגור")),...L.map(t=>el("div",{},"• "+t)),
+    el("div",{class:"note"},"בכל מקום: החיפוש למעלה מוצא לקוח / מספר הזמנה / מוצר מכל הלשוניות; Enter על מספר הזמנה פותח את הכרטיס. ↶ מבטל את הפעולה האחרונה (עד 10 אחורה, גם Ctrl+Z).")))}
 function enter(){if(S.timer)return;$("gate").hidden=true;$("app").hidden=false;$("fab").hidden=false;$("whoLbl").textContent=S.who;load();S.timer=setInterval(load,90000)}
 function setAll(all){S.all=all;S.since=all.reduce((m,o)=>(o.updatedAt||"")>m?o.updatedAt:m,"");S.leads=all.filter(isL);S.quotes=all.filter(isQ);S.sups=all.filter(isS);S.sinv=all.filter(isV);S.orders=all.filter(o=>!isQ(o)&&!isL(o)&&!isS(o)&&!isV(o))}
 async function load(){try{const ae=document.activeElement;if(S.orders.length&&ae&&(ae.tagName==="INPUT"||ae.tagName==="TEXTAREA")&&ae.id!=="q"&&ae.id!=="chatIn")return;
   const d=await run("getData",S.pw,S.all&&S.since?S.since:"");let all;
-  if(d.delta){if(!(d.orders||[]).length){$("sync").textContent=d.sync?("עודכן: "+d.sync):"מחובר";return}const by=new Map(S.all.map(o=>[o.id,o]));(d.orders||[]).forEach(o=>by.set(o.id,o));all=[...by.values()]}   // רק שורות שהשתנו מגיעות מהשרת
-  else{all=d.orders||[];const sig=JSON.stringify(all);if(sig===S.sig&&S.orders.length){$("sync").textContent=d.sync?("עודכן: "+d.sync):"מחובר";return}S.sig=sig}
-  setAll(all);S.leads=all.filter(isL);S.quotes=all.filter(isQ);S.sups=all.filter(isS);S.sinv=all.filter(isV);S.orders=all.filter(o=>!isQ(o)&&!isL(o)&&!isS(o)&&!isV(o));if(!S.tabSet&&S.leads.some(o=>o.stage==="lead")){S.tab="leads";S.tabSet=1}S.ai=d.ai||S.ai;$("sync").textContent=d.sync?("עודכן: "+d.sync):"מחובר";render()}catch(e){$("sync").textContent="שגיאה בטעינה: "+e.message}}
+  if(d.delta){if(!(d.orders||[]).length){syncLbl(d);return}const by=new Map(S.all.map(o=>[o.id,o]));(d.orders||[]).forEach(o=>by.set(o.id,o));all=[...by.values()]}   // רק שורות שהשתנו מגיעות מהשרת
+  else{all=d.orders||[];const sig=JSON.stringify(all);if(sig===S.sig&&S.orders.length){syncLbl(d);return}S.sig=sig}
+  setAll(all);S.leads=all.filter(isL);S.quotes=all.filter(isQ);S.sups=all.filter(isS);S.sinv=all.filter(isV);S.orders=all.filter(o=>!isQ(o)&&!isL(o)&&!isS(o)&&!isV(o));if(!S.tabSet&&S.leads.some(o=>o.stage==="lead")){S.tab="leads";S.tabSet=1}S.ai=d.ai||S.ai;syncLbl(d);render()}catch(e){$("sync").textContent="שגיאה בטעינה: "+e.message}}
+function syncLbl(d){S.lastSync=d.sync?("עודכן: "+d.sync):"מחובר";if(!S.saving)$("sync").textContent=S.lastSync}
 
 /* ---- עזרים ---- */
 const isoL=d=>{d=d instanceof Date?d:new Date(d);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
@@ -275,7 +307,30 @@ function missing(o){const m=[];if(!o.model&&!o.desc)m.push("מוצר");if(!o.qty
 const isLate=o=>OPEN.includes(o.stage)&&(daysSince(o.date)||0)>(+o.leadDays||63);
 const sup=o=>(o.suppliers||[]).map(s=>s.name).join(", ");
 function ral(c){if(!c)return null;const m=String(c).match(/\b(\d{3,4})\b/);const hx=m&&RAL[m[1]];return el("span",{class:"tag"},hx?el("span",{class:"sw",style:"background:"+hx}):null,c)}
-function dups(){const c={};S.orders.forEach(o=>{if(o.num)c[o.num]=(c[o.num]||0)+1});return new Set(Object.keys(c).filter(k=>c[k]>1))}
+/* ---- שורת פעולות אחידה לכל הזמנה, בכל מסך: השלב הבא, בחירת שלב, הובלה/התקנה, סגירה, כרטיס ---- */
+const NEXT={new:"material",material:"prod",prod:"paint",paint:"ready",ready:"delivered",delivered:"closed"};
+function setStage(o,k){if(!k||k===o.stage)return;const today=isoL(new Date()),p={stage:k,stageUser:today};if(k==="delivered"||k==="closed")p.closedDate=today;save(o,p,"שלב שונה ל: "+stageL(k))}
+function actBar(o,opts){opts=opts||{};if(isL(o)||isQ(o)||isS(o)||isV(o))return null;const nx=NEXT[o.stage];
+  const sel=el("select",{class:"stsel","aria-label":"שלב",onchange:()=>setStage(o,sel.value)},...STAGES.map(s=>el("option",{value:s.k},s.l)));sel.value=STAGES.some(s=>s.k===o.stage)?o.stage:"new";
+  const ship=el("div",{hidden:true}),more=el("div",{hidden:true});
+  const tog=(box,fill)=>()=>{if(box.hidden){put(box,fill());box.hidden=false}else box.hidden=true};
+  return el("div",{class:"actwrap"},el("div",{class:"acts"},
+    nx?el("button",{class:"btn primary",type:"button",title:"העבר לשלב הבא",onclick:()=>setStage(o,nx)},"← "+stageL(nx)):null,
+    sel,
+    el("button",{class:"btn",type:"button",onclick:tog(ship,()=>shipForm(o,ship))},"הובלה / התקנה"),
+    el("button",{class:"btn",type:"button",onclick:tog(more,()=>[closeControls(o),el("p",{class:"note",style:"margin:4px 0 0"},"סגור עם שארית = מה שנשאר נרשם ולא נעלם. הסגירה נשמרת ולא נדרסת על ידי הסנכרון.")])},"סגירה…"),
+    opts.sheet?null:el("button",{class:"btn",type:"button",onclick:()=>openSheet(o.id)},"כרטיס")),ship,more)}
+const REGIONS=["דרום","מרכז","צפון","ירושלים"];
+function shipForm(o,box){const ops=OPS(o),sh=ops.ship||{},today=isoL(new Date());
+  const dv=el("select",{},...["","הובלה","הובלה והתקנה","משלוח","איסוף עצמי"].map(x=>el("option",{value:x},x||"לא צוין")));dv.value=o.delivery||"";
+  const rg=el("select",{},el("option",{value:""},"לפי הכתובת ("+regionAuto(o)+")"),...REGIONS.map(r=>el("option",{value:r},r)));rg.value=ops.region||"";
+  const who=el("input",{value:sh.who||"",placeholder:"מי מוביל: הנהג שלנו / ציון / חברת שילוח…",list:"shipWho"}),when=el("input",{type:"date",value:sh.when||""}),inst=el("input",{value:sh.inst||"",placeholder:"מי מתקין (אם יש התקנה)",list:"instWho"}),addr=el("input",{value:o.address||"",placeholder:"כתובת אספקה"}),nt=el("input",{value:sh.note||"",placeholder:"הערה: שעות, מנוף, איש קשר בשטח…"});
+  const dl=(id,key)=>el("datalist",{id},...[...new Set(S.orders.map(x=>(OPS(x).ship||{})[key]).filter(Boolean))].slice(0,30).map(x=>el("option",{value:x})));
+  return el("div",{class:"tedit"},...fld("אספקה",dv),...fld("אזור",rg),...fld("כתובת",addr),...fld("מוביל",who),...fld("תאריך הובלה",when),...fld("מתקין",inst),...fld("הערה",nt),dl("shipWho","who"),dl("instWho","inst"),
+    el("div",{class:"tbtns"},el("button",{class:"btn primary",type:"button",onclick:()=>{const n={who:who.value.trim(),when:when.value,inst:inst.value.trim(),note:nt.value.trim(),by:S.who,at:today};
+      const p={delivery:dv.value,address:addr.value.trim()};const txt=["הובלה: "+(dv.value||"לא צוין"),rg.value&&"אזור "+rg.value,n.who&&"מוביל "+n.who,n.when&&"ב-"+fmt(n.when),n.inst&&"מתקין "+n.inst,n.note].filter(Boolean).join(" · ");
+      saveOps(o,ops=>{ops.ship=n;if(rg.value)ops.region=rg.value;else delete ops.region},txt,p);box.hidden=true}},"שמור"),el("button",{class:"btn",type:"button",onclick:()=>{box.hidden=true}},"ביטול")))}
+function shipTags(o){const sh=OPS(o).ship||{};return [sh.who?el("span",{class:"tag"},"מוביל: "+sh.who+(sh.when?" "+fmt(sh.when):"")):null,sh.inst?el("span",{class:"tag"},"מתקין: "+sh.inst):null]}
 
 
 /* ---- לידים ופניות ---- */
@@ -316,10 +371,14 @@ function newLeadForm(){const f=["customer:שם הלקוח / העסק","contact:�
       try{const n=await run("addOrder",S.pw,o,S.who);S.leads.push(n);if(S.all)S.all.push(n);S.newLead=false;render()}catch(e){toast("השמירה נכשלה: "+e.message)}}},"שמור פנייה"),el("button",{class:"btn",type:"button",onclick:()=>{S.newLead=false;render()}},"ביטול")));
   return box}
 function renderLeads(v,q){let L=S.leads;if(S.qsel)L=L.filter(o=>S.qsel.has(o.id));if(q)L=L.filter(o=>textHit(o,q)||String(o.email||"").includes(q));
+  const mineOf=o=>{const m=String(o.moreContacts||"").match(/אחראי:\s*([^·]+)/);return (m?m[1]:"יניב").trim()};
+  const mineN=L.filter(o=>o.stage==="lead"&&mineOf(o)===S.who).length;if(S.mine)L=L.filter(o=>mineOf(o)===S.who);   // "שלי": רק פניות שאני האחראי עליהן
   const today=isoL(new Date()),ago=n=>{const d=new Date();d.setDate(d.getDate()-n);return isoL(d)};
   const open=L.filter(o=>o.stage==="lead"),snz=open.filter(o=>o.nextFollow&&o.nextFollow>today),act=open.filter(o=>!(o.nextFollow&&o.nextFollow>today)).sort((a,b)=>(a.date||"").localeCompare(b.date||""));
   const recent=L.filter(o=>o.stage!=="lead"&&(o.updatedAt||o.date||"").slice(0,10)>=ago(14)).sort((a,b)=>(b.updatedAt||"").localeCompare(a.updatedAt||""));
-  v.replaceChildren(el("div",{class:"smartbar"},el("b",{},act.length+" פניות לטיפול"),snz.length?el("span",{class:"tag"},"ממתינות: "+snz.length):null,el("span",{class:"note"},"מכל הערוצים: אתר, מייל, וואטסאפ, שיחות. מתעדכן כל בוקר מדוח הבוקר."),el("button",{class:"btn primary",type:"button",onclick:()=>{S.newLead=true;render()}},"+ פנייה חדשה")),
+  put(v,el("div",{class:"smartbar"},el("b",{},act.length+" פניות לטיפול"),snz.length?el("span",{class:"tag"},"ממתינות: "+snz.length):null,
+      el("button",{type:"button",class:"btn"+(S.mine?" primary":""),style:"padding:4px 10px",onclick:()=>{S.mine=!S.mine;render()}},S.mine?"שלי ✓":"רק שלי ("+mineN+")"),
+      el("span",{class:"note"},"מכל הערוצים: אתר, מייל, וואטסאפ, שיחות. מתעדכן כל בוקר."),el("button",{class:"btn primary",type:"button",onclick:()=>{S.newLead=true;render()}},"+ פנייה חדשה")),
     S.newLead?newLeadForm():null,
     act.length?el("details",{class:"qgrp",open:true},el("summary",{},"לטיפול – הוותיקות קודם ",el("span",{class:"cnt"},act.length)),...act.map(lCard)):el("div",{class:"empty"},"אין פניות פתוחות 👍"),
     snz.length?el("details",{class:"qgrp",open:true},el("summary",{},"ממתינות – כבר דיברת ",el("span",{class:"cnt"},snz.length)),...snz.sort((a,b)=>a.nextFollow.localeCompare(b.nextFollow)).map(lCard)):null,
@@ -333,7 +392,10 @@ function todayStrip(){const today=isoL(new Date());
   const late=S.orders.filter(o=>OPEN.includes(o.stage)&&isLate(o)).length,d60=(()=>{const d=new Date();d.setDate(d.getDate()-60);return isoL(d)})();
   const go=(tab,extra)=>()=>{clearSel();S.tab=tab;S.kpi="";S.qst="all";S.searchAll=false;Object.assign(S,extra||{});if(extra&&extra.q!=null)$("q").value=extra.q;else $("q").value="";render()};
   const it=(n,l,fn,warnN)=>el("button",{type:"button",class:"tchip"+(n>=(warnN||1)?" hot":""),onclick:fn},el("b",{class:"num"},n),el("span",{},l));
-  return [el("span",{class:"tlabel"},"היום:"),it(leads,"פניות לטיפול",go("leads")),it(cold,"הצעות מתקררות",go("quotes",{qst:"cold"})),it(warm,"הצעות לבדוק",go("quotes",{qst:"warm"}),99),it(won,"אושרו בלי הזמנה",go("quotes")),it(dnNoInv,"ת.מ בלי חשבונית (30 יום)",go("list",{q:"תעודת משלוח בלי חשבונית בחודש האחרון"})),it(late,"הזמנות באיחור",()=>{S.tab="list";S.kpi="late";$("q").value="";render()},99),it(dWork().length,"חזרו מהצבע – לעבודה",go("deliv"),99),it(dReady().length,"מוכנות – לתכנן הובלה",go("deliv"),99),it((x=>x.done.length+x.stale.length+x.withT.length)(decideLists()),"להחלטה / סגירה",go("decide"),99),S.sinv.length?it(invExc().filter(e=>e.date>=d60).length,"חריגות מחיר בחשבוניות ספק (60 יום)",go("sup",{supView:"exc"})):null]}
+  /* 4 מונים עיקריים; השאר תחת "עוד" – כדי שהמסך לא יהיה עמוס */
+  const main=[it(leads,"פניות לטיפול",go("leads")),it(late,"הזמנות באיחור",()=>{S.tab="list";S.kpi="late";$("q").value="";render()},99),it(dReady().length,"מוכנות לאספקה",go("deliv",{dView:"ready"}),99),it((x=>x.done.length+x.stale.length+x.withT.length)(decideLists()),"להחלטה / סגירה",go("decide"),99)];
+  const more=[it(dWork().length,"חזרו מהצבע – לעבודה",go("deliv",{dView:"work"}),99),it(cold,"הצעות מתקררות",go("quotes",{qst:"cold"})),it(warm,"הצעות לבדוק",go("quotes",{qst:"warm"}),99),it(won,"אושרו בלי הזמנה",go("quotes")),it(dnNoInv,"ת.מ בלי חשבונית (30 יום)",go("list",{q:"תעודת משלוח בלי חשבונית בחודש האחרון"})),S.sinv.length?it(invExc().filter(e=>e.date>=d60).length,"חריגות מחיר בחשבוניות ספק (60 יום)",go("sup",{supView:"exc"})):null].filter(Boolean);
+  return [el("span",{class:"tlabel"},"היום:"),...main,el("button",{type:"button",class:"tchip",style:"border-style:dashed",onclick:()=>{S.moreToday=!S.moreToday;render()}},S.moreToday?"פחות ▴":"עוד "+more.length+" ▾"),...(S.moreToday?more:[])]}
 
 /* ---- הצעות מחיר: מעקב אחרי הצעות שלא הפכו להזמנה ---- */
 function isQ(o){return /^quote/.test(o.stage||"")}
@@ -407,11 +469,11 @@ function renderQuotes(v,q){const today=isoL(new Date());
   const won=S.quotes.filter(o=>o.stage==="quote_won").length,lost=S.quotes.filter(o=>o.stage==="quote_lost").length,sum=L.reduce((a,o)=>a+money(o),0);
   const head=el("div",{class:"smartbar"},el("b",{},L.length+" הצעות"),el("span",{class:"note"},"סה\"כ "+Math.round(sum).toLocaleString("he-IL")+" ₪"),el("span",{class:"tag"},"התקבלו: "+won),el("span",{class:"tag"},"ירדו: "+lost),sortSel);
   const chips=el("div",{class:"qbtns",style:"margin:0 0 10px"},chip("all","הכל",Object.values(counts).reduce((a,b)=>a+b,0)),chip("cold","מתקררות",counts.cold||0),chip("warm","לבדוק",counts.warm||0),chip("new","חדשות",counts.new||0),chip("snooze","ממתינות",counts.snooze||0),chip("old","ישנות",counts.old||0),chip("maybe","אולי הפכה להזמנה",S.quotes.filter(o=>o.stage==="quote"&&(o.flags||[]).length).length));
-  if(so!=="group"){v.replaceChildren(head,chips,...L.sort(SORTS[so][1]).map(qCard));return}
+  if(so!=="group"){put(v,head,chips,...L.sort(SORTS[so][1]).map(qCard));return}
   const by=(a,b)=>(a.date||"").localeCompare(b.date||"");
   const g=["cold","warm","new","snooze","old"].map(k=>[QST[k],L.filter(o=>qStatus(o,today)===k).sort(k==="snooze"?(a,b)=>a.nextFollow.localeCompare(b.nextFollow):by)]);
   const toOpen=S.quotes.filter(o=>o.stage==="quote_won"&&(o.flags||[]).some(f=>/^סימנת 'התקבלה הזמנה'/.test(f)));
-  v.replaceChildren(head,chips,
+  put(v,head,chips,
     toOpen.length?el("details",{class:"qgrp",open:true},el("summary",{style:"color:#c0392b"},"אושרו ועדיין אין הזמנה ברווחית – לפתוח הזמנה ולגבות מקדמה ",el("span",{class:"cnt"},toOpen.length)),...toOpen.map(qCard)):null,
     ...g.filter(x=>x[1].length).map(([t,list],i)=>el("details",{class:"qgrp",open:i<3||st!=="all"},el("summary",{},t+" ",el("span",{class:"cnt"},list.length)),...list.map(qCard))))}
 
@@ -464,10 +526,10 @@ function parseQ(raw){let q=" "+raw.replace(/[?!,.]/g," ").replace(/\s+/g," ")+" 
   return {preds:P,labels:L,rest,scopeAll,smart:P.length>0,rng,dateIdx}}
 function hayOf(o){return [o.num,o.rivhitNum,o.customer,o.rivhitCustomer,o.model,o.desc,o.color,o.contact,o.phone,o.address,o.custPO,o.invoice,o.email,sup(o),(o.rivhitLines||[]).join(" "),(((o.ops||{}).todo)||[]).map(t=>t.t+" "+(t.who||"")).join(" "),((o.ops||{}).close||{}).reason||"",(o.links||[]).filter(l=>!l.hidden&&/^(?:supplier|rivhit|ret|forOrder)$/.test(l.type||"")).map(l=>(l.title||"")+" "+(l.type==="ret"?(l.dn||"")+" "+(l.sn||""):"")).join(" ")].join(" ")}
 function textHit(o,w){return hayOf(o).includes(w)}
-function filt(list){const q=$("q").value.trim(),sp=$("fSupplier").value,dv=$("fDeliv").value,dd=dups(),pq=q?parseQ(q):null;
+function filt(list){const q=$("q").value.trim(),sp=$("fSupplier").value,dv=$("fDeliv").value,pq=q?parseQ(q):null;
   return list.filter(o=>{if(S.qsel&&!S.qsel.has(o.id))return false;if(pq&&pq.smart){if(!pq.preds.every(f=>f(o))||!pq.rest.every(w=>textHit(o,w)))return false}else if(q&&!textHit(o,q))return false;
     if(sp&&!(o.suppliers||[]).some(s=>s.name===sp))return false;if(dv==="?"&&o.delivery)return false;if(dv&&dv!=="?"&&o.delivery!==dv)return false;
-    if(S.kpi==="miss"&&!missing(o).length)return false;if(S.kpi==="late"&&!isLate(o))return false;if(S.kpi==="flag"&&!(o.flags||[]).length)return false;if(S.kpi==="dup"&&!dd.has(o.num))return false;
+    if(S.kpi==="miss"&&!missing(o).length)return false;if(S.kpi==="late"&&!isLate(o))return false;if(S.kpi==="flag"&&!(o.flags||[]).length)return false;
     if(STAGES.some(s=>s.k===S.kpi)&&o.stage!==S.kpi)return false;return true})}
 
 /* ---- תצוגה ---- */
@@ -479,12 +541,12 @@ function render0(){
   const K=[["","הזמנות פתוחות",open.length],["prod","בייצור",open.filter(o=>o.stage==="prod").length],["paint","בצבע",open.filter(o=>o.stage==="paint").length],["material","ממתינות לספק",open.filter(o=>o.stage==="material").length],["ready","מוכנות לאספקה",open.filter(o=>o.stage==="ready").length],["miss","חסרים פרטים",open.filter(o=>missing(o).length).length,1],["flag","לבדוק מול רווחית",open.filter(o=>(o.flags||[]).length).length,1],["late","חורגות מזמן אספקה",open.filter(isLate).length,1]];
   $("kpis").replaceChildren(...K.map(([k,l,n,a])=>el("button",{class:"kpi"+(a&&n?" alert":"")+(S.kpi===k&&k?" on":""),type:"button",onclick:()=>{S.kpi=S.kpi===k?"":k;if(k&&S.tab==="hist")S.tab="list";render()}},el("b",{class:"num"},n),el("span",{},l))));
   for(const[id,t]of[["tabLeads","leads"],["tabList","list"],["tabDeliv","deliv"],["tabDecide","decide"],["tabBoard","board"],["tabQuotes","quotes"],["tabSup","sup"],["tabHist","hist"]])$(id).setAttribute("aria-selected",S.tab===t);
-  try{const at=document.querySelector('.tabs [aria-selected="true"]');if(at&&at.scrollIntoView)at.scrollIntoView({inline:"nearest",block:"nearest"})}catch(e){}
+  try{const at=document.querySelector('.tabs [aria-selected="true"]'),tb=at&&at.parentNode;if(tb){const r=at.getBoundingClientRect(),p=tb.getBoundingClientRect();if(r.left<p.left)tb.scrollLeft-=(p.left-r.left)+8;else if(r.right>p.right)tb.scrollLeft+=(r.right-p.right)+8}}catch(e){}   // גלילת שורת הלשוניות בלבד (scrollIntoView הזיז את כל הדף בטלפון)
   const v=$("view");
-  if(!S.orders.length){v.replaceChildren(el("div",{class:"empty"},"טוען הזמנות…"));return}
+  if(!S.orders.length){put(v,el("div",{class:"empty"},"טוען הזמנות…"));return}
   const q=$("q").value.trim(),pqs=q?parseQ(q):null;
   if(pqs&&pqs.smart&&S.searchAll!==false&&/^(?:leads|quotes|sup|deliv|decide)$/.test(S.tab))S.tab="list";
-  $("today").replaceChildren(...todayStrip());
+  put($("today"),todayStrip());helpBox();drawUndo();
   $("kpis").hidden=!/^(?:list|board|hist)$/.test(S.tab)||!!(q&&!S.qsel&&S.searchAll!==false&&!pqs.smart);
   if(q&&!S.qsel&&S.searchAll!==false&&!parseQ(q).smart){renderSearch(v,q);return}
   if(S.tab==="deliv"){renderDeliv(v,q);return}
@@ -492,16 +554,17 @@ function render0(){
   if(S.tab==="quotes"){renderQuotes(v,q);return}
   if(S.tab==="sup"){renderSups(v,q);return}
   if(S.tab==="leads"){renderLeads(v,q);return}
-  if(S.tab==="board"){const fo=filt(open);v.replaceChildren(el("div",{class:"lanes"},...OPEN.map(st=>{const it=fo.filter(o=>o.stage===st).sort((a,b)=>(a.date||"").localeCompare(b.date||""));return el("div",{class:"lane"},el("h3",{},stageL(st),el("span",{class:"num note"},it.length)),...it.map(card))})));}
+  if(S.tab==="board"){const fo=filt(open);put(v,el("div",{class:"lanes"},...OPEN.map(st=>{const it=fo.filter(o=>o.stage===st).sort((a,b)=>(a.date||"").localeCompare(b.date||""));return el("div",{class:"lane"},el("h3",{},stageL(st),el("span",{class:"num note"},it.length)),...it.map(card))})));}
   else{const pq=q?parseQ(q):null;const base=S.tab==="hist"?closed:(q||S.qsel?S.orders:open);const list=filt(base).sort((a,b)=>S.tab==="hist"?(b.closedDate||b.date||"").localeCompare(a.closedDate||a.date||""):(b.date||"").localeCompare(a.date||""));
     const sum=list.reduce((a,o)=>a+money(o),0);
-    v.replaceChildren(...[selBar(list.length,sum),supStrip(q),pq&&pq.smart?el("div",{class:"smartbar"},el("b",{},"נמצאו "+list.length+" הזמנות"),pq.labels.map(t=>el("span",{class:"tag"},t)),pq.rest.length?el("span",{class:"tag"},"מכיל: "+pq.rest.join(" ")):null,sum?el("span",{class:"note"},"סה\"כ "+Math.round(sum).toLocaleString("he-IL")+" ₪"):null,S.tab==="hist"?el("span",{class:"note"},"(רק בהיסטוריה. בלשונית עץ הזמנות החיפוש על כל ההזמנות)"):null):null,
+    put(v,...[selBar(list.length,sum),supStrip(q),pq&&pq.smart?el("div",{class:"smartbar"},el("b",{},"נמצאו "+list.length+" הזמנות"),pq.labels.map(t=>el("span",{class:"tag"},t)),pq.rest.length?el("span",{class:"tag"},"מכיל: "+pq.rest.join(" ")):null,sum?el("span",{class:"note"},"סה\"כ "+Math.round(sum).toLocaleString("he-IL")+" ₪"):null,S.tab==="hist"?el("span",{class:"note"},"(רק בהיסטוריה. בלשונית עץ הזמנות החיפוש על כל ההזמנות)"):null):null,
       list.length?el("div",{class:"olist"},...list.map(row)):el("div",{class:"empty"},"אין הזמנות שמתאימות לסינון."),
       S.tab==="hist"?el("p",{class:"note"},"סופק = יש תעודת משלוח מלאה ברווחית. סגור = סופק ושולם, או נסגר בחשבונית וקבלה."):null].filter(Boolean))}
 }
-function tagsFor(o,withStage){const m=missing(o),late=isLate(o);return el("div",{class:"tags"},withStage?el("span",{class:"stg s-"+o.stage},stageL(o.stage)):null,ral(o.color),o.delivery?el("span",{class:"tag"},o.delivery):null,sup(o)?el("span",{class:"tag"},"ספק: "+sup(o)):null,o.orderTotal?el("span",{class:"tag num"},o.orderTotal):null,late?el("span",{class:"tag b"},daysSince(o.date)+" ימים"):null,openTodos(o).length?el("span",{class:"tag w"},"נקודות פתוחות: "+openTodos(o).length):null,(OPS(o).close||{}).type==="remainder"?el("span",{class:"tag"},"נסגרה עם שארית"):null,OPEN.includes(o.stage)&&m.length?el("span",{class:"tag w"},"חסר: "+m.join(", ")):null,...(o.flags||[]).map(f=>el("span",{class:"tag b"},f)))}
+function tagsFor(o,withStage){const m=missing(o),late=isLate(o);return el("div",{class:"tags"},withStage?el("span",{class:"stg s-"+o.stage},stageL(o.stage)):null,ral(o.color),o.delivery?el("span",{class:"tag"},o.delivery):null,...shipTags(o),sup(o)?el("span",{class:"tag"},"ספק: "+sup(o)):null,o.orderTotal?el("span",{class:"tag num"},o.orderTotal):null,late?el("span",{class:"tag b"},daysSince(o.date)+" ימים"):null,openTodos(o).length?el("span",{class:"tag w"},"נקודות פתוחות: "+openTodos(o).length):null,(OPS(o).close||{}).type==="remainder"?el("span",{class:"tag"},"נסגרה עם שארית"):null,OPEN.includes(o.stage)&&m.length?el("span",{class:"tag w"},"חסר: "+m.join(", ")):null,...(o.flags||[]).map(f=>el("span",{class:"tag b"},f)))}
 function cls(o){return (!OPEN.includes(o.stage)?" hist":(o.flags||[]).length?" flag":isLate(o)?" late":missing(o).length?" miss":"")}
-function card(o){return el("button",{class:"card"+cls(o),type:"button",onclick:()=>openSheet(o.id)},el("div",{class:"r1"},el("span",{class:"cust"},o.customer||"ללא שם"),el("span",{class:"num"},o.num||"")),el("div",{class:"what"},[o.qty,o.model,o.desc].filter(Boolean).join(" · ")),tagsFor(o,false))}
+function card(o){const nx=NEXT[o.stage];return el("div",{class:"card"+cls(o)},el("button",{class:"cardhead",type:"button",onclick:()=>openSheet(o.id)},el("div",{class:"r1"},el("span",{class:"cust"},o.customer||"ללא שם"),el("span",{class:"num"},o.num||"")),el("div",{class:"what"},[o.qty,o.model,o.desc].filter(Boolean).join(" · ")),tagsFor(o,false)),
+  el("div",{class:"acts"},nx?el("button",{class:"btn",type:"button",style:"padding:4px 10px;font-size:13px",onclick:()=>setStage(o,nx)},"← "+stageL(nx)):null,el("button",{class:"lnk",type:"button",onclick:()=>openSheet(o.id)},"כרטיס")))}
 function row(o){const isOpen=S.open===o.id;
   return el("div",{class:"orow"+cls(o),"open-row":isOpen},
     el("button",{class:"ohead",type:"button","aria-expanded":isOpen?"true":"false",onclick:()=>{S.open=isOpen?null:o.id;render()}},
@@ -511,6 +574,7 @@ function row(o){const isOpen=S.open===o.id;
       el("span",{class:"what"},[o.qty,o.model,o.desc].filter(Boolean).join(" · ")),
       tagsFor(o,false)),
     isOpen?el("div",{class:"obody"},
+      actBar(o),
       el("div",{class:"note"},[o.contact&&("איש קשר: "+o.contact),o.phone,o.address&&("כתובת: "+o.address),o.fixing&&("קיבוע: "+o.fixing)].filter(Boolean).join(" · ")),
       tree(o,true),
       el("div",{},el("button",{class:"btn primary",type:"button",onclick:()=>openSheet(o.id)},"פתח כרטיס הזמנה ועדכון"))):null)}
@@ -528,7 +592,7 @@ function removeItem(o,i){
 function fld(lbl,inp){return [el("label",{},lbl),inp]}
 function editRow(o,i,isNew){const cancel=el("button",{class:"btn",type:"button",onclick:()=>render()},"ביטול");const today=isoL(new Date());
   const btns=fn=>el("div",{class:"tbtns"},el("button",{class:"btn primary",type:"button",onclick:fn},"שמור"),cancel);
-  if(i.type==="supplier"){const s=isNew?{}:o.suppliers[i._s];
+  if(i.type==="supplier"&&(isNew||i._s!=null)){const s=isNew?{}:o.suppliers[i._s];
     const n=el("input",{value:s.name||"",placeholder:"שם הספק / הקבלן / המתקין"}),ro=el("select",{},el("option",{value:""},"תפקיד…"),...ROLES.map(r=>el("option",{value:r},r)));ro.value=s.role||"";
     const it=el("input",{value:s.item||"",placeholder:"מה הוזמן / מה בוצע"}),d=el("input",{type:"date",value:s.date||(isNew?today:"")}),pr=el("input",{value:s.price||"",placeholder:"לא חובה"}),st=el("input",{value:s.status||"",placeholder:"הוזמן / סופק / הותקן…"}),nt=el("textarea",{rows:2,placeholder:"הערה שלך"},s.note||"");
     return el("div",{class:"tedit"},...fld("שם",n),...fld("תפקיד",ro),...fld("מה",it),...fld("תאריך",d),...fld("מחיר",pr),...fld("סטטוס",st),...fld("הערה",nt),btns(()=>{if(!n.value.trim())return;const a=[...(o.suppliers||[])];const v=Object.assign({},s,{name:n.value.trim(),role:ro.value,item:it.value.trim(),date:d.value,price:pr.value.trim(),status:st.value.trim(),note:nt.value.trim(),by:S.who});
@@ -556,7 +620,23 @@ function tree(o,openAll,editable=true){const it=items(o),ph=o.phone?String(o.pho
 function openSheet(id){S.sheet=id;drawSheet()}
 function closeSheet(){S.sheet=null;$("sheetRoot").replaceChildren()}
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeSheet()});
-async function save(o,patch,text){try{const n=await run("updateOrder",S.pw,o.id,patch,text,S.who);if(S.all){const i=S.all.findIndex(x=>x.id===o.id);if(i>=0)S.all[i]=n;else S.all.push(n);if((n.updatedAt||"")>(S.since||""))S.since=n.updatedAt}S.orders=S.orders.filter(x=>x.id!==o.id);S.quotes=S.quotes.filter(x=>x.id!==o.id);S.leads=S.leads.filter(x=>x.id!==o.id);(isL(n)?S.leads:isQ(n)?S.quotes:S.orders).push(n);render()}catch(e){alertSync("השמירה נכשלה: "+e.message)}}
+/* שמירה: המסך מתעדכן מיד (אופטימי), השרת מתעדכן ברקע; בכשל חוזרים למצב הקודם. כל שמירה נכנסת למחסנית הביטול (10 צעדים) */
+function putRow(n){if(S.all){const i=S.all.findIndex(x=>x.id===n.id);if(i>=0)S.all[i]=n;else S.all.push(n);if((n.updatedAt||"")>(S.since||""))S.since=n.updatedAt}
+  S.orders=S.orders.filter(x=>x.id!==n.id);S.quotes=S.quotes.filter(x=>x.id!==n.id);S.leads=S.leads.filter(x=>x.id!==n.id);(isL(n)?S.leads:isQ(n)?S.quotes:S.orders).push(n)}
+const clone=x=>x==null?x:JSON.parse(JSON.stringify(x));
+async function save(o,patch,text,opts){opts=opts||{};patch=patch||{};
+  const prev={};Object.keys(patch).forEach(k=>{prev[k]=clone(o[k]===undefined?"":o[k])});
+  if(!opts.noUndo&&Object.keys(patch).length){S.undo.push({id:o.id,prev,label:text||Object.keys(patch).join(", "),who:o.customer||"",t:Date.now()});if(S.undo.length>10)S.undo.shift()}
+  const local=Object.assign({},o,clone(patch));if(text)local.log=(o.log||[]).concat([{t:new Date().toISOString(),by:S.who,text}]).slice(-80);
+  putRow(local);render();S.saving=(S.saving||0)+1;$("sync").textContent="שומר…";
+  try{const n=await run("updateOrder",S.pw,o.id,patch,text,S.who);putRow(n);if(S.sheet===o.id)drawSheet();if(opts.then)opts.then(n)}
+  catch(e){putRow(o);render();toast("השמירה נכשלה: "+e.message+" – השינוי בוטל");if(!opts.noUndo)S.undo=S.undo.filter(u=>!(u.id===o.id&&u.prev===prev))}
+  finally{S.saving--;if(!S.saving)$("sync").textContent=S.lastSync||"מחובר";drawUndo()}}
+function rowById(id){return (S.all||[]).find(x=>x.id===id)||S.orders.find(x=>x.id===id)||S.quotes.find(x=>x.id===id)||S.leads.find(x=>x.id===id)}
+function undo(){const u=S.undo.pop();if(!u)return;const o=rowById(u.id);if(!o){drawUndo();return}
+  save(o,u.prev,"בוטל: "+String(u.label).slice(0,120),{noUndo:true});toast("בוטל: "+u.label)}
+function drawUndo(){const b=$("btnUndo");if(!b)return;const u=S.undo[S.undo.length-1];b.hidden=!u;if(u)b.title="בטל: "+u.label+(u.who?" ("+u.who+")":"")+" · Ctrl+Z";b.textContent="↶ בטל"+(S.undo.length>1?" ("+S.undo.length+")":"")}
+document.addEventListener("keydown",e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="z"&&!/INPUT|TEXTAREA/.test((document.activeElement||{}).tagName||"")){e.preventDefault();undo()}});
 function alertSync(t){$("sync").textContent=t}
 function drawSheet(){const o=S.orders.find(x=>x.id===S.sheet)||S.quotes.find(x=>x.id===S.sheet)||S.leads.find(x=>x.id===S.sheet);if(!o)return closeSheet();
   const idx=STAGES.findIndex(s=>s.k===o.stage),m=missing(o);
@@ -568,7 +648,8 @@ function drawSheet(){const o=S.orders.find(x=>x.id===S.sheet)||S.quotes.find(x=>
   const lT=el("select",{id:"lT"},...TYPES.map(t=>el("option",{value:t.k},t.l))),lD=el("input",{id:"lD",type:"date",value:isoL(new Date())}),lTi=el("input",{id:"lTi",placeholder:"כותרת"}),lU=el("input",{id:"lU",placeholder:"קישור (לא חובה)"});
   $("sheetRoot").replaceChildren(el("div",{class:"scrim",onclick:closeSheet}),el("aside",{class:"sheet",role:"dialog","aria-label":"הזמנה "+o.num},
     el("div",{class:"hd"},el("div",{},el("div",{class:"note num"},"הזמנה "+(o.num||"—")+(o.custPO?" · הזמנת לקוח "+o.custPO:"")+(o.orderTotal?" · "+o.orderTotal:"")),el("h2",{},o.customer||"")),el("button",{class:"btn",type:"button",onclick:closeSheet},"סגור")),
-    el("div",{class:"stepper"},...STAGES.map((s,i)=>el("button",{type:"button",class:i<idx?"done":i===idx?"cur":"",onclick:()=>{if(s.k!==o.stage)save(o,Object.assign({stage:s.k,stageUser:isoL(new Date())},s.k==="delivered"||s.k==="closed"?{closedDate:isoL(new Date())}:{}),"שלב שונה ל: "+s.l)}},s.l))),
+    el("div",{class:"stepper"},...STAGES.map((s,i)=>el("button",{type:"button",class:i<idx?"done":i===idx?"cur":"",onclick:()=>setStage(o,s.k)},s.l))),
+    actBar(o,{sheet:true}),
     ...(o.flags||[]).map(f=>el("div",{class:"box b"},el("b",{},"רווחית: "),f)),
     OPEN.includes(o.stage)&&m.length?el("div",{class:"box"},"חסרים פרטים: ",el("b",{},m.join(", "))):null,
     !isL(o)&&!isQ(o)?closeSec(o):null,!isL(o)&&!isQ(o)?todoSec(o):null,
@@ -582,7 +663,11 @@ function drawSheet(){const o=S.orders.find(x=>x.id===S.sheet)||S.quotes.find(x=>
     el("section",{class:"sec"},el("h3",{},"יומן עדכונים"),note,el("button",{class:"btn primary",type:"button",style:"margin-top:6px",onclick:()=>{const t=note.value.trim();if(t)save(o,{},t)}},"הוסף עדכון"),
       el("div",{class:"log",style:"margin-top:8px"},...[...(o.log||[])].reverse().map(l=>el("div",{},l.text,el("br"),el("small",{},new Date(l.t).toLocaleString("he-IL",{dateStyle:"short",timeStyle:"short"})+" · "+(l.by||"סנכרון"))))))))}
 
-$("q").addEventListener("input",()=>{clearSel();S.searchAll=true;render()});["fSupplier","fDeliv"].forEach(id=>$(id).addEventListener("input",render));
+/* חיפוש: רינדור אחרי הפסקה קצרה בהקלדה (לא על כל תו); Enter על מספר הזמנה פותח את הכרטיס ישירות */
+let qTimer=0;$("q").addEventListener("input",()=>{clearSel();S.searchAll=true;clearTimeout(qTimer);qTimer=setTimeout(render,160)});["fSupplier","fDeliv"].forEach(id=>$(id).addEventListener("input",render));
+$("q").addEventListener("keydown",e=>{if(e.key!=="Enter")return;const q=$("q").value.trim();if(!/^\d{3,6}$/.test(q))return;const n=q.replace(/^0+/,"");
+  const o=S.orders.find(x=>String(x.num).replace(/^0+/,"")===n||String(x.rivhitNum||"").replace(/^0+/,"")===n)||S.quotes.find(x=>String(x.num)===n);if(o){e.preventDefault();openSheet(o.id);return}
+  const s=S.sups.find(x=>String(x.num)===n);if(s){e.preventDefault();S.supSheet=s.id;drawSup()}});
 for(const[id,t]of[["tabLeads","leads"],["tabList","list"],["tabDeliv","deliv"],["tabDecide","decide"],["tabBoard","board"],["tabQuotes","quotes"],["tabSup","sup"],["tabHist","hist"]])$(id).addEventListener("click",()=>{S.tab=t;S.kpi="";S.searchAll=false;render()});
 
 
@@ -628,10 +713,11 @@ function decideCard(o,why){
     why==="done"?el("div",{class:"box b"},...(o.flags||[]).filter(f=>SEEMS_DONE.test(f))):why==="stale"?el("div",{class:"note"},"ללא עדכון ידני "+dAgo(lastTouch(o))+" ימים"+(o.delivery?" · "+o.delivery:"")):null,
     openTodos(o).length?el("div",{class:"tags"},...openTodos(o).map(t=>el("span",{class:"tag w"},t.k+": "+t.t+(t.who?" ("+t.who+")":"")))):null,
     closeControls(o),
-    el("div",{class:"qbtns"},el("button",{class:"btn",type:"button",onclick:()=>saveOps(o,ops=>{ops.snooze=plusDays(30)},"נשארת בטיפול – נדחתה להחלטה ל-30 יום")},"עדיין בטיפול – לדחות 30 יום"),el("button",{class:"btn",type:"button",onclick:()=>openSheet(o.id)},"כרטיס הזמנה")))}
+    el("div",{class:"qbtns"},el("button",{class:"btn",type:"button",onclick:()=>saveOps(o,ops=>{ops.snooze=plusDays(30)},"נשארת בטיפול – נדחתה להחלטה ל-30 יום")},"עדיין בטיפול – לדחות 30 יום"),el("button",{class:"btn",type:"button",onclick:()=>openSheet(o.id)},"כרטיס הזמנה")),
+    actBar(o))}
 function renderDecide(v,q){const L=decideLists(),hit=o=>!q||hitLoose(o,q),D=L.done.filter(hit),St=L.stale.filter(hit).sort((a,b)=>lastTouch(a).localeCompare(lastTouch(b))),W=L.withT.filter(hit),lim=S.decLim||40;
   const grp=(t,arr,why,open)=>el("details",{class:"qgrp",open:open},el("summary",{},t+" ",el("span",{class:"cnt"},arr.length)),...(arr.length?arr.slice(0,lim).map(o=>decideCard(o,why)):[el("div",{class:"empty"},"אין.")]),arr.length>lim?el("button",{class:"btn",type:"button",onclick:()=>{S.decLim=lim+40;render()}},"הצג עוד ("+(arr.length-lim)+")"):null);
-  v.replaceChildren(el("div",{class:"smartbar"},el("b",{},"להחלטה: "+(D.length+St.length+W.length)),el("span",{class:"note"},"כאן מחליטים מה קורה עם הזמנות שנשארו פתוחות: לסגור, לסגור עם שארית, להמשיך או לבטל. זנב שמוותרים עליו נרשם כשארית ולא נעלם.")),
+  put(v,el("div",{class:"smartbar"},el("b",{},"להחלטה: "+(D.length+St.length+W.length)),el("span",{class:"note"},"כאן מחליטים מה קורה עם הזמנות שנשארו פתוחות: לסגור, לסגור עם שארית, להמשיך או לבטל. זנב שמוותרים עליו נרשם כשארית ולא נעלם.")),
     grp("נראה שסופקו ושולמו – לאשר סגירה",D,"done",true),grp("עם נקודות פתוחות (תיקונים, חוסרים, זנבות)",W,"todo",true),grp("ישנות, בלי עדכון ידני 45 ימים – להחליט",St,"stale",D.length+W.length===0))}
 
 /* ---- הגדרות ---- */
@@ -706,11 +792,11 @@ function supStrip(q){if(!q||q.length<3)return null;const m=supFind(q,6),iv=invFi
 function renderSups(v,q){const view=S.supView||"orders",exc=invExc();
   const seg=el("div",{style:"display:flex;gap:6px;flex-wrap:wrap"},...[["orders","הזמנות ספק ("+S.sups.length+")"],["inv","חשבוניות ("+S.sinv.length+")"],["exc","חריגות מחיר ("+exc.length+")"]].map(([k,l])=>el("button",{type:"button",class:"btn"+(view===k?" primary":""),onclick:()=>{S.supView=k;render()}},l)));
   if(view==="inv"){let L=q?invFind(q,1000):S.sinv;L=L.slice().sort((a,b)=>(b.date||"").localeCompare(a.date||"")||String(b.num).localeCompare(String(a.num)));
-    v.replaceChildren(seg,el("div",{class:"smartbar"},el("b",{},L.length+" חשבוניות ספק"),el("span",{class:"note"},q?"":"הקלד למעלה מספר חשבונית, תעודת משלוח, מספר הזמנה שלנו, או מה חויב")),
+    put(v,seg,el("div",{class:"smartbar"},el("b",{},L.length+" חשבוניות ספק"),el("span",{class:"note"},q?"":"הקלד למעלה מספר חשבונית, תעודת משלוח, מספר הזמנה שלנו, או מה חויב")),
       L.length?el("div",{class:"olist"},...L.map(invRow)):el("div",{class:"empty"},S.sinv.length?"לא נמצאו חשבוניות.":"עדיין לא נקראו חשבוניות ספק."),
       el("p",{class:"note"},"החשבוניות נקראות מהמייל ומהדרייב ומותאמות לשורות ההזמנה שלנו לפי 13/מספר הזמנה/שורה. בדיקת מחיר: מול חיובים קודמים של אותו מוצר, ולאדניות לפי מחיר למ\"ר (34-40 ₪)."));return}
   if(view==="exc"){const L=q?exc.filter(r=>invFind(q,1000).includes(r.o)):exc;
-    v.replaceChildren(seg,el("div",{class:"smartbar"},el("b",{},L.length+" שורות לבדיקה"),el("span",{class:"note"},"מחיר חריג מול היסטוריה או מחיר למ\"ר לאדניות, כמות או הזמנה שלא נמצאה")),
+    put(v,seg,el("div",{class:"smartbar"},el("b",{},L.length+" שורות לבדיקה"),el("span",{class:"note"},"מחיר חריג מול היסטוריה או מחיר למ\"ר לאדניות, כמות או הזמנה שלא נמצאה")),
       L.length?el("div",{class:"olist"},...L.map(({o,x})=>el("button",{type:"button",class:"orow flag",style:"text-align:right;width:100%;padding:10px 12px;display:grid;gap:3px",onclick:()=>{S.invSheet=o.id;drawInv()}},
         el("div",{class:"t1",style:"display:flex;gap:10px;align-items:baseline;flex-wrap:wrap"},el("b",{class:"num"},o.num),el("span",{class:"note"},fmt(o.date)),el("span",{style:"margin-inline-start:auto;font-weight:700"},nis2(x.u)+" ליח' = "+nis2(x.t))),
         el("div",{style:"font-weight:600"},(x.q?x.q+"× ":"")+x.d),el("div",{class:"tags"},stTag(x.st),x.who?el("span",{class:"tag"},x.who):null),
@@ -721,7 +807,7 @@ function renderSups(v,q){const view=S.supView||"orders",exc=invExc();
   const names=Object.entries(S.sups.reduce((m,o)=>{m[o.customer]=(m[o.customer]||0)+1;return m},{})).sort((a,b)=>b[1]-a[1]).slice(0,12);
   const sel=el("select",{"aria-label":"ספק"},el("option",{value:""},"כל הספקים"),...names.map(([n,c])=>el("option",{value:n},n+" ("+c+")")));sel.value=sp;sel.onchange=()=>{S.supF=sel.value;render()};
   const sum=L.reduce((a,o)=>a+money(o),0),lim=S.supLim||60,shown=L.slice(0,lim),iv=q&&!S.qsel?invFind(q,6):[];
-  v.replaceChildren(selBar(L.length,sum),seg,el("div",{class:"smartbar"},el("b",{},L.length+" הזמנות ספק"),sum?el("span",{class:"note"},"סה\"כ "+nis(sum)+" כולל מע\"מ"):null,sel,el("span",{class:"note"},q?"":"הקלד למעלה מספר הזמנה שלנו (למשל 11236), שם ספק, או מה הוזמן")),
+  put(v,selBar(L.length,sum),seg,el("div",{class:"smartbar"},el("b",{},L.length+" הזמנות ספק"),sum?el("span",{class:"note"},"סה\"כ "+nis(sum)+" כולל מע\"מ"):null,sel,el("span",{class:"note"},q?"":"הקלד למעלה מספר הזמנה שלנו (למשל 11236), שם ספק, או מה הוזמן")),
     iv.length?el("div",{class:"smartbar",style:"display:grid;gap:6px"},el("b",{},"חשבוניות ספק שמתאימות"),...iv.map(invRow)):null,
     shown.length?el("div",{class:"olist"},...shown.map(supRow)):el("div",{class:"empty"},"לא נמצאו הזמנות ספק."),
     L.length>lim?el("button",{class:"btn",type:"button",onclick:()=>{S.supLim=lim+100;render()}},"הצג עוד ("+(L.length-lim)+")"):null,
@@ -742,12 +828,17 @@ function drawSup(){const o=S.sups.find(x=>x.id===S.supSheet);if(!o)return closeS
     fo.length?el("section",{class:"sec"},el("h3",{},"שייך להזמנות לקוח"),el("div",{style:"display:grid;gap:6px"},...fo.map(t=>{const mm=t.match(/הזמנת לקוח (\d+)/);const target=mm&&S.orders.find(x=>String(x.num)===mm[1]);return el("button",{class:"btn",type:"button",style:"text-align:right",onclick:()=>{if(target){S.sheet=target.id;drawSheet()}}},t)}))):el("section",{class:"sec"},el("p",{class:"note"},"לא זוהתה הזמנת לקוח. אם כתבת ברווחית מספר הזמנת לקוח בעמודת המק\"ט, הקישור ייווצר בעיבוד הלילי.")),
     el("section",{class:"sec"},el("p",{class:"note"},String(o.prodNotes||"")),el("button",{class:"btn",type:"button",onclick:copy},"העתק סיכום"))))}
 /* ---- אספקות: סחורה שחזרה מהצבע (תעודות משלוח של פלג ניא) → עבודה לפני אספקה → תכנון הובלה ---- */
-const REGION_T=[[/ירושלים|מבשרת|בית שמש|מעלה אדומים|גבעת זאב|מודיעין עילית|ביתר|אבן ספיר/,"ירושלים והסביבה"],[/באר שבע|אשקלון|אשדוד|קרי?ית גת|נתיבות|שדרות|אופקים|דימונה|ערד|אילת|רהט|גן יבנה|גדרה|קרי?ית מלאכי|שער הנגב|מרחבים|אשכול|נגב|עומר|להבים|מיתר/,"דרום"],[/חיפה|קריות|קרי?ית (?:ים|ביאליק|מוצקין|אתא)|עכו|נהריה|כרמיאל|טבריה|צפת|עפולה|נצרת|מגדל העמק|יקנעם|קרי?ית שמונה|קצרין|זכרון|חדרה|אור עקיבא|קיסריה|בנימינה|פרדס חנה|טירת כרמל|נשר|גליל|גולן|מפרץ/,"צפון"],[/נתניה|הרצליה|רעננה|כפר סבא|הוד השרון|רמת[ -]השרון|קדימה|אבן יהודה|תל מונד|כפר יונה|טירה|טייבה|קלנסווה|שרון|בית חירות|חוף/,"שרון"],[/תל[ -]?אביב|ת"א|רמת גן|גבעתיים|בני ברק|חולון|בת ים|ראשון לציון|ראשל"צ|פתח תקוו?ה|פ"ת|אור יהודה|יהוד|קרי?ית אונו|גבעת שמואל|ראש העין|שוהם|נס ציונה|רחובות|לוד|רמלה|מודיעין|באר יעקב|קרי?ית עקרון|מזכרת בתיה|אלעד|יבנה|גן רוה|כפר שמריהו|סביון/,"מרכז"]];
-function regionOf(o){const t=[o.address,o.customer].filter(Boolean).join(" ");for(const[r,n]of REGION_T)if(r.test(t))return n;return "אזור לא ידוע"}
+/* ארבעה אזורי משלוח (החלטת יניב 10.11): דרום, מרכז (כולל השרון), צפון, ירושלים. נקבע מהכתובת/שם הלקוח, ואפשר לקבוע ידנית ב"הובלה / התקנה" (נשמר ב-ops.region) */
+const REGION_T=[[/ירושלים|מבשרת|בית שמש|מעלה אדומים|גבעת זאב|מודיעין עילית|ביתר|אבן ספיר|מודיעין|הר אדר|אפרת|גוש עציון|קרי?ית ארבע|בנימין|מטה יהודה/,"ירושלים"],
+  [/באר שבע|ב"ש|אשקלון|אשדוד|קרי?ית גת|נתיבות|שדרות|אופקים|דימונה|ערד|אילת|רהט|גן יבנה|גדרה|קרי?ית מלאכי|באר טוביה|שער הנגב|מרחבים|אשכול|נגב|עומר|להבים|מיתר|ירוחם|מצפה רמון|שדה בוקר|יבנה|קרי?ית עקרון|מזכרת בתיה|נס ציונה|רחובות|צאלים|אופקים|בני שמעון/,"דרום"],
+  [/חיפה|קריות|קרי?ית (?:ים|ביאליק|מוצקין|אתא|טבעון|שמונה)|עכו|נהריה|כרמיאל|טבריה|צפת|עפולה|נצרת|מגדל העמק|יקנעם|קצרין|זכרון|חדרה|אור עקיבא|קיסריה|בנימינה|פרדס חנה|טירת כרמל|נשר|גליל|גולן|מפרץ|בית שאן|מעלות|שלומי|חצור|ראש פינה|עמק|כרמל|דאלית|עוספיא|שפרעם|סחנין|טמרה|נוף הגליל|יוקנעם|קיבוץ (?:גת|גבת|יגור)/,"צפון"],
+  [/תל[ -]?אביב|ת"א|רמת גן|גבעתיים|בני ברק|חולון|בת ים|ראשון לציון|ראשל"צ|פתח תקוו?ה|פ"ת|אור יהודה|יהוד|קרי?ית אונו|גבעת שמואל|ראש העין|שוהם|לוד|רמלה|באר יעקב|אלעד|גן רוה|כפר שמריהו|סביון|נתניה|הרצליה|רעננה|כפר סבא|הוד השרון|רמת[ -]השרון|קדימה|אבן יהודה|תל מונד|כפר יונה|טירה|טייבה|קלנסווה|שרון|בית חירות|חוף|כפר חבד|צריפין|ראשון|אזור|חבל מודיעין|נחלים/,"מרכז"]];
+function regionAuto(o){const t=[o.address,o.customer,o.rivhitCustomer].filter(Boolean).join(" ");for(const[r,n]of REGION_T)if(r.test(t))return n;return "לא ידוע"}
+function regionOf(o){return OPS(o).region||regionAuto(o)}
 function rets(o){return (o.links||[]).filter(l=>l.type==="ret"&&!l.hidden)}
 function retDone(l,j){return !!(l.wdone&&l.wdone[j])}
 function retOpenJobs(o){return rets(o).flatMap(l=>(l.work||[]).filter(j=>!retDone(l,j)).map(j=>({l,j})))}
-function atPaint(o){const n=String(o.rivhitNum||o.num||"").replace(/^0+/,"");if(!n)return[];const re=new RegExp("הזמנ(?:ה|ת לקוח) "+n+"(?!\\d)"),out=[];
+function atPaint(o){const n=String(o.rivhitNum||o.num||"").replace(/^0+/,"").replace(/[^\w֐-׿-]/g,"");if(!n)return[];const re=new RegExp("הזמנ(?:ה|ת לקוח) "+n.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"(?!\\d)"),out=[];
   S.sups.forEach(s=>{if(!isPaintSup(s))return;const whole=supFor(s).some(t=>re.test(t));supLines(s).forEach(x=>{if(x.dn||!x.d)return;if(re.test(x.who)||(whole&&!x.who))out.push({s,x})})});return out}
 function dOrders(){return S.orders.filter(o=>OPEN.includes(o.stage))}
 function dWork(){return dOrders().filter(o=>rets(o).length&&retOpenJobs(o).length)}
@@ -755,34 +846,45 @@ function dReady(){return dOrders().filter(o=>o.stage==="ready"||(rets(o).length&
 function dPaint(){return dOrders().filter(o=>!rets(o).length&&atPaint(o).length)}
 function dCard(o,mode){const R=rets(o).sort((a,b)=>(b.date||"").localeCompare(a.date||"")),AP=atPaint(o),open=retOpenJobs(o).length,reg=regionOf(o),today=isoL(new Date());
   const toggle=(l,j)=>{const links=(o.links||[]).map(x=>{if(x!==l)return x;const w=Object.assign({},x.wdone||{});if(w[j])delete w[j];else w[j]={by:S.who,at:today};return Object.assign({},x,{wdone:w})});save(o,{links},(retDone(l,j)?"בוטל: ":"בוצע: ")+j+" – "+(l.qty?l.qty+"× ":"")+(l.desc||""))};
+  /* פריט שחזר מהצבע: אפשר לשייך להזמנה אחרת (אם הזיהוי האוטומטי טעה) או להעביר למלאי */
+  const mvBox=el("div",{hidden:true});
+  const mvForm=l=>{const inp=el("input",{placeholder:"מספר הזמנה",inputmode:"numeric",style:"width:120px"});
+    return el("div",{class:"tedit"},el("label",{},"שייך להזמנה"),el("div",{style:"display:flex;gap:6px;flex-wrap:wrap"},inp,el("button",{class:"btn primary",type:"button",onclick:()=>moveRet(o,l,inp.value.trim())},"העבר"),el("button",{class:"btn",type:"button",onclick:()=>stockRet(o,l)},"למלאי"),el("button",{class:"btn",type:"button",onclick:()=>{mvBox.hidden=true}},"ביטול")))};
   const retRow=l=>el("div",{style:"display:grid;gap:3px;padding:6px 8px;border:1px solid var(--line);border-radius:8px"},
-    el("div",{style:"display:flex;gap:8px;flex-wrap:wrap;align-items:baseline"},el("b",{},(l.qty?l.qty+"× ":"")+(l.desc||"")),el("span",{class:"note num"},fmt(l.date)),l.approx?el("span",{class:"tag w"},"לפי החשבונית"):el("span",{class:"tag g"},"ת.מ "+l.dn)),
+    el("div",{style:"display:flex;gap:8px;flex-wrap:wrap;align-items:baseline"},el("b",{},(l.qty?l.qty+"× ":"")+(l.desc||"")),el("span",{class:"note num"},fmt(l.date)),l.approx?el("span",{class:"tag w"},"לפי החשבונית"):el("span",{class:"tag g"},"ת.מ "+l.dn),l.note?el("span",{class:"tag"},l.note):null,el("span",{class:"sp"}),el("button",{class:"lnk",type:"button",onclick:()=>{put(mvBox,mvForm(l));mvBox.hidden=false}},"לא שייך לכאן?")),
     (l.work||[]).length?el("div",{style:"display:flex;gap:6px;flex-wrap:wrap"},...(l.work||[]).map(j=>{const d=retDone(l,j);return el("label",{class:"tchip"+(d?"":" hot"),style:"cursor:pointer;gap:6px;padding:3px 10px"+(d?";opacity:.7":"")},el("input",{type:"checkbox",checked:d||null,onchange:()=>toggle(l,j)}),el("span",{style:d?"text-decoration:line-through":""},j),d?el("small",{class:"note"},l.wdone[j].by||""):null)})):el("span",{class:"tag g"},"ניתן לספק"));
-  const dv=o.delivery||"",dBtn=(v,l)=>el("button",{type:"button",class:"btn"+(dv===v?" primary":""),onclick:()=>{if(dv!==v)save(o,{delivery:v},"אספקה: "+l)}},l);
   return el("div",{class:"qcard "+(mode==="ready"?"new":open?"warm":"")},
-    el("div",{class:"r1"},el("b",{},o.customer||""),el("span",{class:"num note"},"הזמנה "+(o.num||"")+" · "+fmt(o.date)),el("span",{class:"stg s-"+o.stage},stageL(o.stage)),el("span",{class:"tag"},reg),o.orderTotal?el("span",{class:"tag num"},o.orderTotal):null),
+    el("div",{class:"r1"},el("b",{},o.customer||""),el("span",{class:"num note"},"הזמנה "+(o.num||"")+" · "+fmt(o.date)),el("span",{class:"stg s-"+o.stage},stageL(o.stage)),el("span",{class:"tag",title:OPS(o).region?"נקבע ידנית":"לפי הכתובת"},reg),o.delivery?el("span",{class:"tag"},o.delivery):null,...shipTags(o),o.orderTotal?el("span",{class:"tag num"},o.orderTotal):null),
     el("div",{class:"what"},[o.qty,o.model,o.desc].filter(Boolean).join(" · ").slice(0,200)),
-    el("div",{class:"note"},[o.address&&("כתובת: "+o.address),o.contact,o.phone,o.fixing&&("קיבוע: "+o.fixing),o.promised&&("הובטח: "+fmt(o.promised))].filter(Boolean).join(" · ")),
-    R.length?el("div",{style:"display:grid;gap:6px"},el("div",{class:"note"},el("b",{},"חזר מהצבע"),mode==="ready"?"":" – מה לעשות לפני אספקה:"),...R.map(retRow)):null,
+    el("div",{class:"note"},[o.address&&("כתובת: "+o.address),o.contact,o.phone,o.fixing&&("קיבוע: "+o.fixing),o.promised&&("הובטח: "+fmt(o.promised))].filter(Boolean).join(" · ")||"אין כתובת – להשלים ב'הובלה / התקנה'"),
+    R.length?el("div",{style:"display:grid;gap:6px"},el("div",{class:"note"},el("b",{},"חזר מהצבע"),mode==="ready"?"":" – מה לעשות לפני אספקה:"),...R.map(retRow),mvBox):null,
     AP.length?el("div",{class:"box"},el("b",{},"עדיין בצבע: "),AP.map(({s,x})=>(x.q&&x.q!=="1"?x.q+"× ":"")+x.d+" (הזמנת ספק "+s.num+" מ-"+fmt(s.date)+")").join("; ")):null,
-    el("div",{class:"qbtns"},el("span",{class:"note",style:"align-self:center"},"הובלה:"),dBtn("הובלה","הובלה שלנו"),dBtn("משלוח","חברת שילוח"),dBtn("איסוף עצמי","איסוף עצמי"),dBtn("הובלה והתקנה","הובלה והתקנה"),
-      o.stage!=="ready"?el("button",{class:"btn",type:"button",onclick:()=>save(o,{stage:"ready",stageUser:today},"שלב שונה ל: מוכן לאספקה")},"סמן מוכן לאספקה"):el("button",{class:"btn primary",type:"button",onclick:()=>save(o,{stage:"delivered",stageUser:today,closedDate:today},"שלב שונה ל: סופק")},"סופק"),
-      el("button",{class:"btn",type:"button",onclick:()=>openSheet(o.id)},"כרטיס הזמנה")))}
+    actBar(o))}
+function moveRet(o,l,num){num=String(num||"").replace(/^0+/,"");const t=num&&S.orders.find(x=>x.id!==o.id&&(String(x.num).replace(/^0+/,"")===num||String(x.rivhitNum||"").replace(/^0+/,"")===num));if(!t){toast("לא נמצאה הזמנה "+num);return}
+  const what=(l.qty?l.qty+"× ":"")+(l.desc||"");
+  save(o,{links:(o.links||[]).map(x=>x===l?Object.assign({},x,{k:lkey(x),hidden:true,by:S.who,note:"הועבר להזמנה "+t.num}):x)},"חזר מהצבע – הועבר להזמנה "+t.num+" ("+(t.customer||"")+"): "+what);
+  const nl=Object.assign({},l,{k:lkey(l)+"|mv",by:S.who,note:"הועבר מהזמנה "+o.num,hidden:false});delete nl.wdone;
+  save(t,{links:(t.links||[]).concat([nl])},"חזר מהצבע (הועבר מהזמנה "+o.num+"): "+what);toast("הועבר להזמנה "+t.num+" – "+(t.customer||""))}
+function stockRet(o,l){const what=(l.qty?l.qty+"× ":"")+(l.desc||"");save(o,{links:(o.links||[]).map(x=>x===l?Object.assign({},x,{k:lkey(x),hidden:true,by:S.who,note:"למלאי"}):x)},"חזר מהצבע – הועבר למלאי: "+what);toast("נרשם למלאי: "+what)}
 function renderDeliv(v,q){let W=dWork(),Rd=dReady(),Pt=dPaint();const hit=o=>!q||hitLoose(o,q);W=W.filter(hit);Rd=Rd.filter(hit);Pt=Pt.filter(hit);
   const lastRet=o=>rets(o).reduce((m,l)=>l.date>m?l.date:m,"");W.sort((a,b)=>lastRet(b).localeCompare(lastRet(a)));
-  const byReg={};Rd.forEach(o=>{const r=regionOf(o);(byReg[r]=byReg[r]||[]).push(o)});const regs=Object.entries(byReg).sort((a,b)=>b[1].length-a[1].length);
-  v.replaceChildren(
-    el("div",{class:"smartbar"},el("b",{},W.length+" הזמנות חזרו מהצבע ומחכות לעבודה"),el("span",{class:"tag"},"מוכנות לאספקה: "+Rd.length),el("span",{class:"tag"},"עדיין בצבע: "+Pt.length),el("span",{class:"note"},"לפי תעודות המשלוח של פלג ניא (13/מספר הזמנת ספק/שורה) והזמנות הספק ברווחית. סמן ✓ כשהעבודה בוצעה.")),
-    el("details",{class:"qgrp",open:true},el("summary",{},"חזר מהצבע – להרכיב / לאטום לפני אספקה ",el("span",{class:"cnt"},W.length)),...(W.length?W.map(o=>dCard(o,"work")):[el("div",{class:"empty"},"אין סחורה שחזרה מהצבע וממתינה לעבודה.")])),
-    el("details",{class:"qgrp",open:true},el("summary",{},"מוכן לאספקה – לתכנן הובלה ",el("span",{class:"cnt"},Rd.length)),
-      ...(regs.length?regs.map(([r,L])=>el("div",{},el("div",{class:"note",style:"margin:8px 0 4px;font-weight:700"},r+" · "+L.length+(L.length>1?" הזמנות – אפשר לשלב בהובלה אחת":" הזמנה")),...L.map(o=>dCard(o,"ready")))):[el("div",{class:"empty"},"אין הזמנות מוכנות לאספקה.")])),
-    el("details",{class:"qgrp"},el("summary",{},"עדיין בצבע – ממתין לחזרה מפלג ניא ",el("span",{class:"cnt"},Pt.length)),...Pt.map(o=>dCard(o,"paint"))),
-    el("p",{class:"note"},"כללי העבודה: אשפתונים – פח פנימי; פח מגשים / בורגר ראנץ – דלת; ספסלים – פלטות; אדניות – ניתן לספק, ואם בהזמנת הלקוח כתוב איטום – לאטום. אפשר לשנות את הכללים ב-lsm_returns.py."))}
+  /* שלוש תצוגות: חזר מהצבע (עבודה) / מוכן לאספקה לפי אזור / עדיין בצבע. ברירת מחדל: מה שיש בו עבודה */
+  const view=S.dView||(W.length?"work":"ready"),reg=S.dReg||"";
+  const seg=el("div",{style:"display:flex;gap:6px;flex-wrap:wrap"},...[["work","חזר מהצבע – לעבודה ("+W.length+")"],["ready","מוכן לאספקה ("+Rd.length+")"],["paint","עדיין בצבע ("+Pt.length+")"]].map(([k,l])=>el("button",{type:"button",class:"btn"+(view===k?" primary":""),onclick:()=>{S.dView=k;render()}},l)));
+  const byReg={};Rd.forEach(o=>{const r=regionOf(o);(byReg[r]=byReg[r]||[]).push(o)});
+  const regChips=el("div",{class:"qbtns",style:"margin:0 0 6px"},...[["","הכל",Rd.length],...REGIONS.map(r=>[r,r,(byReg[r]||[]).length]),["לא ידוע","אזור לא ידוע",(byReg["לא ידוע"]||[]).length]].map(([k,l,n])=>el("button",{type:"button",class:"kpi"+(reg===k?" on":""),style:"min-width:auto;padding:6px 12px",onclick:()=>{S.dReg=reg===k?"":k;render()}},el("b",{class:"num"},n),el("span",{},l))));
+  const order=[...REGIONS,"לא ידוע"];const shown=reg?[[reg,byReg[reg]||[]]]:order.filter(r=>byReg[r]).map(r=>[r,byReg[r]]);
+  const body=view==="work"?[el("div",{class:"smartbar"},el("b",{},W.length+" הזמנות חזרו מהצבע ומחכות לעבודה"),el("span",{class:"note"},"לפי תעודות המשלוח של פלג ניא. סמן ✓ כשהעבודה בוצעה; כשהכול בוצע ההזמנה עוברת ל'מוכן לאספקה'. 'לא שייך לכאן?' מעביר פריט להזמנה אחרת או למלאי.")),
+      ...(W.length?W.map(o=>dCard(o,"work")):[el("div",{class:"empty"},"אין סחורה שחזרה מהצבע וממתינה לעבודה.")])]
+    :view==="ready"?[el("div",{class:"smartbar"},el("b",{},Rd.length+" הזמנות מוכנות לאספקה"),el("span",{class:"note"},"לפי אזור משלוח: בחר אזור, ראה מה מוכן ולאן. אפשר לשלב כמה הזמנות בהובלה אחת. האזור נקבע מהכתובת – לתיקון: 'הובלה / התקנה'.")),regChips,
+      ...(shown.length?shown.map(([r,L])=>el("div",{},el("div",{class:"note",style:"margin:8px 0 4px;font-weight:700;font-size:15px"},r+" · "+L.length+(L.length>1?" הזמנות":" הזמנה")),...L.sort((a,b)=>(a.address||"").localeCompare(b.address||"","he")).map(o=>dCard(o,"ready")))):[el("div",{class:"empty"},reg?"אין הזמנות מוכנות ב"+reg+".":"אין הזמנות מוכנות לאספקה.")])]
+    :[el("div",{class:"smartbar"},el("b",{},Pt.length+" הזמנות עדיין בצבע"),el("span",{class:"note"},"ממתינות לחזרה מפלג ניא, לפי הזמנות הספק ברווחית.")),...(Pt.length?Pt.map(o=>dCard(o,"paint")):[el("div",{class:"empty"},"אין הזמנות בצבע."),])];
+  put(v,seg,...body,el("p",{class:"note"},"כללי העבודה אחרי צבע: אשפתונים – פח פנימי; פח מגשים / בורגר ראנץ – דלת; ספסלים – פלטות; אדניות – ניתן לספק, ואם בהזמנת הלקוח כתוב איטום – לאטום."))}
 function retAnswer(t){const q=String(t||"");
-  if(/חזר(?:ו|ה)?\s*מ(?:ה)?(?:צבע|מצבעה)|הגיע(?:ו|ה)?\s+מ(?:פלג|המצבעה)|מה\s+(?:צריך|נשאר)\s+ל(?:הרכיב|עשות|אטום)|לפני\s+(?:ה)?אספקה/.test(q)){const W=dWork();clearSel();S.tab="deliv";render();
+  if(/חזר(?:ו|ה)?\s*מ(?:ה)?(?:צבע|מצבעה)|הגיע(?:ו|ה)?\s+מ(?:פלג|המצבעה)|מה\s+(?:צריך|נשאר)\s+ל(?:הרכיב|עשות|אטום)|לפני\s+(?:ה)?אספקה/.test(q)){const W=dWork();clearSel();S.tab="deliv";S.dView="work";render();
     const head=W.length?W.length+" הזמנות חזרו מהצבע ומחכות לעבודה: "+W.slice(0,4).map(o=>o.customer).join(", "):"אין כרגע סחורה שחזרה מהצבע וממתינה לעבודה";
     return {head,text:head+(W.length?"\n"+W.slice(0,8).map(o=>"הזמנה "+o.num+" "+o.customer+": "+retOpenJobs(o).map(({l,j})=>j+" ("+(l.qty?l.qty+"× ":"")+l.desc+")").join("; ")).join("\n"):"")}}
-  if(/לתכנן\s+הובל|מה\s+(?:אפשר\s+)?לספק|מוכ[נן](?:ות|ים|ה)?\s+לאספקה|הובלות/.test(q)){const Rd=dReady();clearSel();S.tab="deliv";render();
+  if(/לתכנן\s+הובל|מה\s+(?:אפשר\s+)?לספק|מוכ[נן](?:ות|ים|ה)?\s+לאספקה|הובלות/.test(q)){const Rd=dReady();clearSel();S.tab="deliv";S.dView="ready";S.dReg="";render();
     const byReg={};Rd.forEach(o=>{(byReg[regionOf(o)]=byReg[regionOf(o)]||[]).push(o)});
     const head=Rd.length?Rd.length+" הזמנות מוכנות לאספקה"+(Object.keys(byReg).length>1?" ב-"+Object.keys(byReg).length+" אזורים":""):"אין הזמנות מוכנות לאספקה";
     return {head,text:head+(Rd.length?":\n"+Object.entries(byReg).map(([r,L])=>r+": "+L.map(o=>o.customer+(o.delivery?" ("+o.delivery+")":"")).join(", ")).join("\n"):"")}}
@@ -792,7 +894,7 @@ function renderSearch(v,q){const hit=o=>hitLoose(o,q)||String(o.email||"").inclu
   const G=[["leads","פניות ולידים",S.leads.filter(hit),lCard],["open","הזמנות פתוחות",S.orders.filter(o=>OPEN.includes(o.stage)&&hit(o)),row],["deliv","אספקות (חזר מהצבע / מוכן)",dOrders().filter(o=>(rets(o).length||o.stage==="ready")&&hit(o)),o=>dCard(o,"work")],
     ["quotes","הצעות מחיר",S.quotes.filter(hit),qCard],["sup","הזמנות ספק",supFind(q,300),supRow],["inv","חשבוניות ספק",invFind(q,300),invRow],["hist","היסטוריה (סופקו / נסגרו)",S.orders.filter(o=>!OPEN.includes(o.stage)&&hit(o)),row]];
   const total=G.reduce((a,g)=>a+g[2].length,0),TAB={leads:"leads",open:"list",deliv:"deliv",quotes:"quotes",sup:"sup",inv:"sup",hist:"hist"};
-  v.replaceChildren(el("div",{class:"smartbar"},el("b",{},"חיפוש '"+q+"': "+total+" תוצאות"),...G.filter(g=>g[2].length).map(g=>el("button",{type:"button",class:"tag",style:"cursor:pointer",onclick:()=>{const d=document.getElementById("sg_"+g[0]);if(d){d.open=true;d.scrollIntoView({block:"start"})}}},g[1]+": "+g[2].length)),el("button",{class:"btn",type:"button",onclick:()=>{$("q").value="";render()}},"✕ נקה")),
+  put(v,el("div",{class:"smartbar"},el("b",{},"חיפוש '"+q+"': "+total+" תוצאות"),...G.filter(g=>g[2].length).map(g=>el("button",{type:"button",class:"tag",style:"cursor:pointer",onclick:()=>{const d=document.getElementById("sg_"+g[0]);if(d){d.open=true;d.scrollIntoView({block:"start"})}}},g[1]+": "+g[2].length)),el("button",{class:"btn",type:"button",onclick:()=>{$("q").value="";render()}},"✕ נקה")),
     ...(total?G.filter(g=>g[2].length).map(g=>{const lim=S["sl_"+g[0]]||6,L=g[2];
       return el("details",{class:"qgrp",id:"sg_"+g[0],open:true},el("summary",{},g[1]+" ",el("span",{class:"cnt"},L.length)),
         el("div",{class:"olist",style:"margin:6px 0"},...L.slice(0,lim).map(g[3])),
@@ -831,7 +933,7 @@ function finishVoice(){if(!V)return;clearTimeout(V.timer);V.want=false;const t=v
   try{rec&&rec.stop()}catch(e){}
   listening=false;$("fab").classList.remove("rec");vStatus("הקלד שאלה, או לחץ על המיקרופון");V.done="";V.sess="";
   if(t)send(t,true);else $("chatIn").value=""}
-$("chatX").onclick=()=>{$("chat").hidden=true;speechSynthesis&&speechSynthesis.cancel()};
+$("chatX").onclick=()=>{$("chat").hidden=true;speechSynthesis&&speechSynthesis.cancel();if(listening){if(V)V.want=false;try{rec&&rec.stop()}catch(e){}listening=false;$("fab").classList.remove("rec")}};   // סגירת החלון עוצרת גם את ההאזנה (המיקרופון לא נשאר אדום)
 $("muteBtn").onclick=()=>{S.muted=!S.muted;$("muteBtn").textContent=S.muted?"🔇":"🔊";if(S.muted&&window.speechSynthesis)speechSynthesis.cancel()};
 $("chatForm").addEventListener("submit",e=>{e.preventDefault();unlockTTS();const t=$("chatIn").value.trim();if(t)send(t)});
 function addMsg(r,t,sub){const m=el("div",{class:"m "+r},t,sub?el("small",{},sub):null);$("msgs").append(m);$("msgs").scrollTop=1e6;return m}
