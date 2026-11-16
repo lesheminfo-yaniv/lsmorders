@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>הזמנות ל.ש.מ</title>
-<!-- v20 · 10.11.2026 -->
+<!-- v21 · 16.11.2026 -->
 
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700&family=Assistant:wght@400;600;700&family=IBM+Plex+Mono:wght@500&display=swap">
 <style>
@@ -253,7 +253,7 @@ const RAL={"1013":"#e3d9c6","1016":"#f1dd38","1018":"#faca30","1023":"#f9a800","
 const TYPES=[{k:"rivhit",l:"רווחית: הזמנה, תעודות משלוח, חשבוניות",c:"#2f4a66"},{k:"email",l:"מיילים",c:"#c0392b"},{k:"whatsapp",l:"וואטסאפ",c:"#1f9d55"},{k:"call",l:"שיחות טלפון",c:"#8e44ad"},{k:"supplier",l:"ספקים וחומר גלם",c:"#e0a100"},{k:"ret",l:"חזר מהצבע – לעבודה לפני אספקה",c:"#16a085"},{k:"file",l:"קבצים, שרטוטים והצעות מחיר",c:"#7f8c8d"}];
 const el=(t,a={},...c)=>{const e=document.createElement(t);for(const[k,v]of Object.entries(a)){if(k==="class")e.className=v;else if(k.startsWith("on"))e.addEventListener(k.slice(2),v);else if(v!=null&&v!==false)e.setAttribute(k,v===true?"":v)}for(const x of c.flat()){if(x==null||x===false)continue;e.append(x.nodeType?x:document.createTextNode(String(x)))}return e};
 const $=id=>document.getElementById(id);
-const VER="v20";
+const VER="v21";
 const S={orders:[],quotes:[],leads:[],sups:[],sinv:[],tab:"list",kpi:"",pw:"",who:"",open:null,sheet:null,ai:{},muted:false,hist:[],undo:[]};
 /* replaceChildren(null) מציג את הטקסט "null": כל הרינדור עובר דרך put() שמסנן ריקים */
 const put=(v,...c)=>v.replaceChildren(...c.flat(Infinity).filter(x=>x!=null&&x!==false));
@@ -348,7 +348,7 @@ function lCard(o){const days=dAgo(o.date),src=o.desc||"",reply=o.prodNotes||"",w
   const box=el("div",{class:"qmsg",hidden:true},el("textarea",{rows:5},reply||""));
   const open=o.stage==="lead",cls=!open?"done":days>=3?"cold":days>=1?"warm":"new";
   return el("div",{class:"qcard "+cls},
-    el("div",{class:"r1"},el("b",{},o.customer||""),src?el("span",{class:"tag",style:"color:#fff;background:"+(SRC_C[src]||"#7f8c8d")},src):null,el("span",{class:"num note"},fmt(o.date)+" · "+(days===0?"היום":days+" ימים")),!open?el("span",{class:"tag"},stageL(o.stage)):null,o.num?el("span",{class:"tag num"},"הצעה "+o.num):null),
+    el("div",{class:"r1"},el("b",{},o.customer||""),src?el("span",{class:"tag",style:"color:#fff;background:"+(SRC_C[src]||"#7f8c8d")},src):null,el("span",{class:"num note"},fmt(o.date)+" · "+(days===0?"היום":days+" ימים")),!open?el("span",{class:"tag"},stageL(o.stage)):null,o.num?el("span",{class:"tag num"},"הצעה "+o.num):null,sizeTag(o)),
     o.model?el("div",{class:"what"},o.model):null,
     ...(open?(o.flags||[]).map(f=>el("div",{class:"box b"},"לעשות: ",el("b",{},f))):[]),
     el("div",{class:"note"},[o.contact&&("איש קשר: "+o.contact),o.phone,mail,(o.moreContacts||"").replace(/^אחראי: יניב$/,"")].filter(Boolean).join(" · ")),
@@ -370,17 +370,28 @@ function newLeadForm(){const f=["customer:שם הלקוח / העסק","contact:�
     el("div",{class:"tbtns"},el("button",{class:"btn primary",type:"button",onclick:async()=>{const o={stage:"lead",date:isoL(new Date()),desc:src.value,flags:ins.need.value.trim()?[ins.need.value.trim()]:[]};["customer","contact","phone","email","model"].forEach(k=>o[k]=ins[k].value.trim());if(!o.customer&&!o.phone)return;
       try{const n=await run("addOrder",S.pw,o,S.who);S.leads.push(n);if(S.all)S.all.push(n);S.newLead=false;render()}catch(e){toast("השמירה נכשלה: "+e.message)}}},"שמור פנייה"),el("button",{class:"btn",type:"button",onclick:()=>{S.newLead=false;render()}},"ביטול")));
   return box}
+/* הערכת גודל פנייה מהטקסט (אין שדה כמות/סכום בפנייה): סכום ב-₪ מהטקסט או מההצעה המקושרת, וכמות לפי "24 פחים", "100 יחידות", "50 מטר". אומדן בלבד – מוצג עם ~ */
+const QTY_RX=/(?<![\d.\-])(\d{1,4})\s*(?:יח['׳]?(?:ידות)?|פחים?|פחי|אשפתונים?|ספסלים?|אדניות|אדנית|עמודים?|עמודי|מתקנים?|מתקני|מאפרות|קולרים?|מעקות|כסאות|שולחנות|מגשים|פרגולות|תיבות|מטר|מ['׳](?![א-ת])|יחידה|יחידות|ק"ג|מ"ר|סטים?|חבילות)/g;
+function leadSize(o){const t=[o.model,o.desc,...(o.flags||[]),o.prodNotes].filter(Boolean).join(" ");let amt=0,qty=0;
+  const qn=o.num&&S.quotes.find(x=>String(x.num)===String(o.num));if(qn)amt=money(qn);
+  for(const m of t.matchAll(/(?<![\d.])([\d,]{1,9}(?:\.\d+)?)\s*(?:₪|ש"ח|ש״ח|שח|שקל)/g)){const n=+m[1].replace(/,/g,"");if(n>amt&&n<5e6)amt=n}
+  for(const m of t.matchAll(QTY_RX)){const n=+m[1];if(n>qty&&n<=5000)qty=n}
+  return {amt,qty}}
+function sizeTag(o){const s=leadSize(o);if(!s.amt&&!s.qty)return null;return el("span",{class:"tag num",title:"אומדן מהטקסט"},"~"+(s.amt?Math.round(s.amt).toLocaleString("he-IL")+" ₪":"")+(s.amt&&s.qty?" · ":"")+(s.qty?s.qty+" יח'":""))}
+const LSORTS={old:["הוותיקות קודם",(a,b)=>(a.date||"").localeCompare(b.date||"")],new:["החדשות קודם",(a,b)=>(b.date||"").localeCompare(a.date||"")],size:["גודל עבודה (כמות)",(a,b)=>leadSize(b).qty-leadSize(a).qty||(a.date||"").localeCompare(b.date||"")],amount:["סכום – מהגבוה",(a,b)=>leadSize(b).amt-leadSize(a).amt||leadSize(b).qty-leadSize(a).qty||(a.date||"").localeCompare(b.date||"")]};
 function renderLeads(v,q){let L=S.leads;if(S.qsel)L=L.filter(o=>S.qsel.has(o.id));if(q)L=L.filter(o=>textHit(o,q)||String(o.email||"").includes(q));
+  const ls=LSORTS[S.lsort||store.get("lsm_lsort")]?(S.lsort||store.get("lsm_lsort")):"old";S.lsort=ls;
+  const sortSel=el("select",{"aria-label":"מיון פניות",style:"padding:4px 8px;border:1px solid var(--line);border-radius:8px;background:var(--panel)"},...Object.entries(LSORTS).map(([k,[l]])=>el("option",{value:k},"מיון: "+l)));sortSel.value=ls;sortSel.onchange=()=>{S.lsort=sortSel.value;store.set("lsm_lsort",sortSel.value);render()};
   const mineOf=o=>{const m=String(o.moreContacts||"").match(/אחראי:\s*([^·]+)/);return (m?m[1]:"יניב").trim()};
   const mineN=L.filter(o=>o.stage==="lead"&&mineOf(o)===S.who).length;if(S.mine)L=L.filter(o=>mineOf(o)===S.who);   // "שלי": רק פניות שאני האחראי עליהן
   const today=isoL(new Date()),ago=n=>{const d=new Date();d.setDate(d.getDate()-n);return isoL(d)};
-  const open=L.filter(o=>o.stage==="lead"),snz=open.filter(o=>o.nextFollow&&o.nextFollow>today),act=open.filter(o=>!(o.nextFollow&&o.nextFollow>today)).sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+  const open=L.filter(o=>o.stage==="lead"),snz=open.filter(o=>o.nextFollow&&o.nextFollow>today),act=open.filter(o=>!(o.nextFollow&&o.nextFollow>today)).sort(LSORTS[ls][1]);
   const recent=L.filter(o=>o.stage!=="lead"&&(o.updatedAt||o.date||"").slice(0,10)>=ago(14)).sort((a,b)=>(b.updatedAt||"").localeCompare(a.updatedAt||""));
   put(v,el("div",{class:"smartbar"},el("b",{},act.length+" פניות לטיפול"),snz.length?el("span",{class:"tag"},"ממתינות: "+snz.length):null,
-      el("button",{type:"button",class:"btn"+(S.mine?" primary":""),style:"padding:4px 10px",onclick:()=>{S.mine=!S.mine;render()}},S.mine?"שלי ✓":"רק שלי ("+mineN+")"),
+      el("button",{type:"button",class:"btn"+(S.mine?" primary":""),style:"padding:4px 10px",onclick:()=>{S.mine=!S.mine;render()}},S.mine?"שלי ✓":"רק שלי ("+mineN+")"),sortSel,
       el("span",{class:"note"},"מכל הערוצים: אתר, מייל, וואטסאפ, שיחות. מתעדכן כל בוקר."),el("button",{class:"btn primary",type:"button",onclick:()=>{S.newLead=true;render()}},"+ פנייה חדשה")),
     S.newLead?newLeadForm():null,
-    act.length?el("details",{class:"qgrp",open:true},el("summary",{},"לטיפול – הוותיקות קודם ",el("span",{class:"cnt"},act.length)),...act.map(lCard)):el("div",{class:"empty"},"אין פניות פתוחות 👍"),
+    act.length?el("details",{class:"qgrp",open:true},el("summary",{},"לטיפול – "+LSORTS[ls][0]+" ",el("span",{class:"cnt"},act.length)),...act.map(lCard)):el("div",{class:"empty"},"אין פניות פתוחות 👍"),
     snz.length?el("details",{class:"qgrp",open:true},el("summary",{},"ממתינות – כבר דיברת ",el("span",{class:"cnt"},snz.length)),...snz.sort((a,b)=>a.nextFollow.localeCompare(b.nextFollow)).map(lCard)):null,
     recent.length?el("details",{class:"qgrp"},el("summary",{},"טופלו או נשלחה הצעה ב-14 הימים האחרונים ",el("span",{class:"cnt"},recent.length)),...recent.map(lCard)):null)}
 function todayStrip(){const today=isoL(new Date());
