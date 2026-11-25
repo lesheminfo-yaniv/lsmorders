@@ -239,6 +239,7 @@ textarea{min-height:60px}
     <button class="ghost" id="muteBtn" type="button" aria-label="השתק הקראה">🔊</button>
     <button class="ghost" id="chatX" type="button" aria-label="סגור">✕</button></div>
   <div class="msgs" id="msgs"><div class="m a">שאל אותי בקול או בכתב. למשל: "מה מוכן לאספקה?", "מה המצב של נס ציונה?", "אילו הזמנות ממתינות לספק?"</div></div>
+  <div class="note" id="vHint" style="padding:0 10px" aria-live="polite"></div>
   <form id="chatForm"><input id="chatIn" lang="he" enterkeyhint="send" autocomplete="off" placeholder="הקלד שאלה, או לחץ על המיקרופון"><button class="btn primary" type="submit">שלח</button></form>
 </div>
 <button class="fab" id="fab" type="button" aria-label="שאלה קולית" hidden>
@@ -545,7 +546,7 @@ function filt(list){const q=$("q").value.trim(),sp=$("fSupplier").value,dv=$("fD
 
 /* ---- תצוגה ---- */
 function selBar(n,sum){if(!S.qsel)return null;return el("div",{class:"smartbar"},el("b",{},"תוצאת השאלה: "+n),S.qlabel?el("span",{class:"tag"},S.qlabel):null,sum?el("span",{class:"note"},"סה\"כ "+nis(sum)):null,el("button",{class:"btn",type:"button",onclick:()=>{clearSel();render()}},"✕ נקה"))}
-function render(){render0();if(S.sheet)drawSheet()}
+function render(){const y=window.scrollY,same=S._rt===S.tab;S._rt=S.tab;render0();if(S.sheet)drawSheet();if(same&&Math.abs(window.scrollY-y)>2)window.scrollTo(0,y)}
 function render0(){
   const open=S.orders.filter(o=>OPEN.includes(o.stage)),closed=S.orders.filter(o=>!OPEN.includes(o.stage));
   const fs=$("fSupplier"),cur=fs.value;fs.replaceChildren(el("option",{value:""},"כל הספקים"),...[...new Set(S.orders.flatMap(o=>(o.suppliers||[]).map(s=>s.name)))].sort().map(n=>el("option",{value:n},n)));fs.value=cur;
@@ -577,8 +578,8 @@ function cls(o){return (!OPEN.includes(o.stage)?" hist":(o.flags||[]).length?" f
 function card(o){const nx=NEXT[o.stage];return el("div",{class:"card"+cls(o)},el("button",{class:"cardhead",type:"button",onclick:()=>openSheet(o.id)},el("div",{class:"r1"},el("span",{class:"cust"},o.customer||"ללא שם"),el("span",{class:"num"},o.num||"")),el("div",{class:"what"},[o.qty,o.model,o.desc].filter(Boolean).join(" · ")),tagsFor(o,false)),
   el("div",{class:"acts"},nx?el("button",{class:"btn",type:"button",style:"padding:4px 10px;font-size:13px",onclick:()=>setStage(o,nx)},"← "+stageL(nx)):null,el("button",{class:"lnk",type:"button",onclick:()=>openSheet(o.id)},"כרטיס")))}
 function row(o){const isOpen=S.open===o.id;
-  return el("div",{class:"orow"+cls(o),"open-row":isOpen},
-    el("button",{class:"ohead",type:"button","aria-expanded":isOpen?"true":"false",onclick:()=>{S.open=isOpen?null:o.id;render()}},
+  return el("div",{class:"orow"+cls(o),"open-row":isOpen,"data-id":o.id},
+    el("button",{class:"ohead",type:"button","aria-expanded":isOpen?"true":"false",onclick:e=>{const b=e.currentTarget,t0=b.getBoundingClientRect().top;S.open=isOpen?null:o.id;render();const nb=[...document.querySelectorAll(".ohead")].find(x=>x.closest(".orow")&&x.closest(".orow").dataset.id===o.id);if(nb)window.scrollBy(0,nb.getBoundingClientRect().top-t0)}},
       el("span",{class:"car"},"◂"),
       el("span",{class:"t1"},el("span",{class:"num"},o.num||"—"),el("span",{class:"cust"},o.customer||""),el("span",{class:"note"},fmt(o.date))),
       el("span",{class:"stg s-"+o.stage},stageL(o.stage)),
@@ -919,34 +920,39 @@ $("fab").onclick=()=>{$("chat").hidden=false;unlockTTS();
   if(IN_GOOGLE){$("chatIn").focus();if(!S.micHint){S.micHint=1;addMsg("a",/Android|iPhone|iPad/i.test(navigator.userAgent)?"לדבר: לחץ על סימן המיקרופון שבמקלדת של הטלפון ודבר. בסיום לחץ \"שלח\". את התשובה אקריא בקול (הכפתור ▶ מקריא שוב).":"לדבר במחשב: לחץ Windows+H והתחל לדבר, ואז Enter. בקישור של גוגל הדפדפן חוסם את המיקרופון של האתר עצמו. את התשובה אקריא בקול (הכפתור ▶ מקריא שוב).")}return}
   if(!SR){$("chatIn").focus();addMsg("a","המיקרופון של הדפדפן לא זמין כאן. לחץ על סימן המיקרופון במקלדת של הטלפון ודבר, או הקלד.");return}
   if(listening){finishVoice();return}   // לחיצה נוספת = סיימתי, שלח עכשיו
-  V={done:"",sess:"",want:true,timer:0};startRec()};
-/* האזנה רציפה: לא שולחים בהפסקה קצרה. שולחים אחרי SILENCE של שקט, במילה "זהו/שלח", או בלחיצה על המיקרופון */
-const SILENCE=3500;let V=null;
-const END_RX=/\s*(זהו|זה הכל|זה הכול|סיימתי|שלח|תשלח)[.!?\s]*$/;
+  try{speechSynthesis&&speechSynthesis.cancel()}catch(e){}   // לא מקליטים את ההקראה של התשובה הקודמת
+  V={done:"",sess:"",want:true,timer:0,grace:0,closed:false};startRec()};
+/* האזנה רציפה: לא שולחים בהפסקה קצרה. אחרי SILENCE של שקט מודיעים "שולח…" ומחכים עוד GRACE; דיבור נוסף ממשיך את השאלה, נגיעה בטקסט עוצרת לתיקון.
+   מילת סיום ("זהו", "שלח") נספרת רק כמילה שלמה בסוף, כדי ש"נשלח" לא יחתוך את המשפט. כל סבב האזנה נסגר פעם אחת בלבד (closed), כך שתוצאה מאוחרת מהדפדפן לא שולחת את השאלה שוב. */
+const SILENCE=4000,GRACE=1500,MIC_IDLE="הקלד שאלה, או לחץ על המיקרופון";let V=null;
+const END_RX=/(?:^|\s)(זהו|זה הכל|זה הכול|סיימתי|שלח|תשלח)[.!?\s]*$/;
 function vText(){return (V.done+" "+V.sess).replace(/\s+/g," ").trim()}
-function vStatus(t){$("chatIn").placeholder=t}
-function armTimer(){clearTimeout(V.timer);if(vText())V.timer=setTimeout(finishVoice,SILENCE)}
-function startRec(){rec=new SR();rec.lang="he-IL";rec.interimResults=true;rec.continuous=true;rec.maxAlternatives=1;V.sess="";
-  rec.onstart=()=>{listening=true;$("fab").classList.add("rec");vStatus("מקשיב… קח את הזמן. לסיום: שתוק 3 שניות, תגיד \"זהו\" או לחץ שוב על המיקרופון")};
-  rec.onresult=e=>{let fin="",tmp="";
+function vStatus(t,hint){$("chatIn").placeholder=t;$("vHint").textContent=hint||""}
+function vClear(){clearTimeout(V.timer);clearTimeout(V.grace);V.timer=V.grace=0}
+function armTimer(ms){vClear();if(!vText())return;$("vHint").textContent="מקשיב… לסיום: שתיקה קצרה, \"זהו\", או לחיצה על המיקרופון";
+  V.timer=setTimeout(()=>{$("vHint").textContent="שולח… כדי להמשיך פשוט דבר. כדי לתקן גע בטקסט";V.grace=setTimeout(finishVoice,GRACE)},ms||SILENCE)}
+function vStopUI(){listening=false;$("fab").classList.remove("rec")}
+function startRec(){const v=V,live=()=>v===V&&!v.closed;rec=new SR();rec.lang="he-IL";rec.interimResults=true;rec.continuous=true;rec.maxAlternatives=1;v.sess="";
+  rec.onstart=()=>{if(!live())return;listening=true;$("fab").classList.add("rec");vStatus("מקשיב… קח את הזמן","מקשיב… לסיום: שתיקה קצרה, \"זהו\", או לחיצה על המיקרופון")};
+  rec.onresult=e=>{if(!live())return;let fin="",tmp="";
     for(let i=0;i<e.results.length;i++){const x=e.results[i][0].transcript.trim();if(!x)continue;
       if(e.results[i].isFinal){fin=fin&&x.indexOf(fin)===0?x:(fin?fin+" "+x:x)}else tmp=tmp?tmp+" "+x:x}  // באנדרואיד תוצאות חוזרות מצטברות: לא מכפילים
-    V.sess=(fin+" "+tmp).trim();$("chatIn").value=vText();
-    if(END_RX.test(vText())){V.sess=V.sess.replace(END_RX,"");if(!END_RX.test(V.done))return finishVoice()}
-    armTimer()};
-  rec.onerror=e=>{if(e.error==="no-speech"||e.error==="aborted")return;V.want=false;
+    v.sess=(fin+" "+tmp).trim();$("chatIn").value=vText();
+    armTimer(END_RX.test(vText())?600:0)};
+  rec.onerror=e=>{if(!live()||e.error==="no-speech"||e.error==="aborted")return;v.want=false;
     addMsg("a",e.error==="not-allowed"||e.error==="service-not-allowed"?"הדפדפן לא מאפשר מיקרופון בדף הזה. לחץ על סימן המיקרופון במקלדת של הטלפון ודבר, או הקלד.":e.error==="audio-capture"?"לא נמצא מיקרופון במחשב, או שתוכנה אחרת תופסת אותו (זום, טימס, וואטסאפ). בדוק בהגדרות הקול של Windows.":e.error==="network"?"זיהוי הדיבור לא מצליח להתחבר לשרת (שגיאת רשת). בדפדפן Edge זה קורה לפעמים: נסה ב-Chrome.":"המיקרופון נעצר (קוד: "+e.error+"). לחץ שוב על המיקרופון.")};
-  rec.onend=()=>{V.done=vText();V.sess="";   // הדפדפן עוצר לבד אחרי הפסקה: ממשיכים להקשיב עד שהשאלה הסתיימה
-    if(V.want){try{rec.start();return}catch(e){}}
-    listening=false;$("fab").classList.remove("rec");vStatus("הקלד שאלה, או לחץ על המיקרופון")};
+  rec.onend=()=>{if(!live())return;v.done=vText();v.sess="";   // הדפדפן עוצר לבד אחרי הפסקה: ממשיכים להקשיב עד שהשאלה הסתיימה
+    if(v.want){try{rec.start();return}catch(e){}}
+    if(v.done)return;   // נעצר עם טקסט (למשל שגיאת רשת): הטיימר ישלח את מה שנקלט
+    v.closed=true;vClear();vStopUI();vStatus(MIC_IDLE)};
   try{rec.start()}catch(e){}}
-function finishVoice(){if(!V)return;clearTimeout(V.timer);V.want=false;const t=vText().replace(END_RX,"").trim();
-  try{rec&&rec.stop()}catch(e){}
-  listening=false;$("fab").classList.remove("rec");vStatus("הקלד שאלה, או לחץ על המיקרופון");V.done="";V.sess="";
+function vClose(){if(!V||V.closed)return false;V.closed=true;vClear();V.want=false;try{rec&&rec.stop()}catch(e){}vStopUI();return true}
+function finishVoice(){if(!V||V.closed)return;const t=vText().replace(END_RX,"").trim();vClose();vStatus(MIC_IDLE);V.done="";V.sess="";
   if(t)send(t,true);else $("chatIn").value=""}
-$("chatX").onclick=()=>{$("chat").hidden=true;speechSynthesis&&speechSynthesis.cancel();if(listening){if(V)V.want=false;try{rec&&rec.stop()}catch(e){}listening=false;$("fab").classList.remove("rec")}};   // סגירת החלון עוצרת גם את ההאזנה (המיקרופון לא נשאר אדום)
+$("chatIn").addEventListener("pointerdown",()=>{if(V&&!V.closed&&vText()&&vClose())vStatus(MIC_IDLE,"ההאזנה נעצרה. תקן את הטקסט ולחץ \"שלח\"")});   // נגיעה בטקסט בזמן האזנה = רוצה לתקן לפני שליחה
+$("chatX").onclick=()=>{$("chat").hidden=true;speechSynthesis&&speechSynthesis.cancel();if(vClose()){vStatus(MIC_IDLE);$("chatIn").value=""}};   // סגירת החלון עוצרת גם את ההאזנה (המיקרופון לא נשאר אדום)
 $("muteBtn").onclick=()=>{S.muted=!S.muted;$("muteBtn").textContent=S.muted?"🔇":"🔊";if(S.muted&&window.speechSynthesis)speechSynthesis.cancel()};
-$("chatForm").addEventListener("submit",e=>{e.preventDefault();unlockTTS();const t=$("chatIn").value.trim();if(t)send(t)});
+$("chatForm").addEventListener("submit",e=>{e.preventDefault();unlockTTS();vClose();$("vHint").textContent="";const t=$("chatIn").value.trim();if(t)send(t)});
 function addMsg(r,t,sub){const m=el("div",{class:"m "+r},t,sub?el("small",{},sub):null);$("msgs").append(m);$("msgs").scrollTop=1e6;return m}
 /* ---- מנוע שאילתות: שאלה → תוכנית (מקומית או מהמודל) → חישוב על הנתונים → תשובה ---- */
 const AMT=t=>+(((String(t||"").match(/([\d,]+)\s*₪/)||[])[1]||"").replace(/,/g,""))||0;
@@ -1066,7 +1072,9 @@ function showResult(res){S.qsel=new Set(res.rows.map(o=>o.id));S.qlabel=res.labe
   if(res.kind==="sups")S.supView="orders";S.tab=res.kind==="sups"?"sup":res.kind==="quotes"?"quotes":res.kind==="leads"?"leads":(res.rows.length&&res.rows.every(o=>!OPEN.includes(o.stage))?"hist":"list");render()}
 function clearSel(){if(S.qsel){S.qsel=null;S.qlabel=""}}
 const FIX_RX=/(^|\s)(לא רגע|רגע|בעצם|סליחה|כלומר|אממ+|אהה+|אה|תתקן|לא לא|התכוונתי|לא,)(\s|$)/;
-async function send(t,voice){$("chatIn").value="";addMsg("u",t);const t0=Date.now();
+async function send(t,voice){$("chatIn").value="";
+  if(voice){if(t===S._lv&&Date.now()-S._lvT<10000)return;S._lv=t;S._lvT=Date.now()}   // אותה שאלה קולית פעמיים בתוך 10 שניות = כפילות של הדפדפן
+  addMsg("u",t);const t0=Date.now();
   {let ia=null;try{ia=retAnswer(t)||invAnswer(t)}catch(e){ia=null}if(ia){addMsg("a",ia.text,"מהנתונים בדשבורד");S.lastAns=ia.head;speak(ia.head);return}}
   const messy=voice&&(FIX_RX.test(t)||t.split(/\s+/).length>14);
   const q=messy?"(השאלה הוכתבה בקול ויש בה היסוסים, מחשבות בקול ותיקונים. התעלם מכל מה שתוקן או בוטל וענה רק על הכוונה הסופית) "+t:t;
